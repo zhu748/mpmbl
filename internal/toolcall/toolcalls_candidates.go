@@ -268,6 +268,11 @@ func normalizeCanonicalToolAttrKey(raw string) string {
 			return "name"
 		}
 	}
+	if next, ok := consumeToolKeyword(trimmed, 0, "value"); ok {
+		if skipToolMarkupIgnorables(trimmed, next) == len(trimmed) {
+			return "value"
+		}
+	}
 	return ""
 }
 
