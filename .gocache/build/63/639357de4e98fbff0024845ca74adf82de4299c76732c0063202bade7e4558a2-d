@@ -1,0 +1,3 @@
+./deepseek_hash.go
+./deepseek_pow.go
+./deepseek_pow_test.go

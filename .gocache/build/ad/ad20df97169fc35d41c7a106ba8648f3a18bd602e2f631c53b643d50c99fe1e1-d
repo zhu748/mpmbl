@@ -1,0 +1,15 @@
+./file_refs.go
+./history_transcript.go
+./message_normalize.go
+./prompt_build.go
+./request_normalize.go
+./responses_input_items.go
+./responses_input_normalize.go
+./standard_request.go
+./thinking_injection.go
+./tool_prompt.go
+./message_normalize_test.go
+./prompt_build_test.go
+./responses_input_items_test.go
+./standard_request_test.go
+./thinking_injection_test.go

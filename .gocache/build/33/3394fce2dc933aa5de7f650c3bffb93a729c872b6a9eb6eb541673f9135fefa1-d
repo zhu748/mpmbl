@@ -1,0 +1,5 @@
+./router.go
+./router_cors_test.go
+./router_health_test.go
+./router_routes_test.go
+./router_utf8_test.go

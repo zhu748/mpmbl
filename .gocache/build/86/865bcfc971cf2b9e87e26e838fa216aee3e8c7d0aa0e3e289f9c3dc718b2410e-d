@@ -1,0 +1,13 @@
+./tool_prompt.go
+./toolcalls_array_parse.go
+./toolcalls_candidates.go
+./toolcalls_dsml.go
+./toolcalls_format.go
+./toolcalls_input_parse.go
+./toolcalls_json_repair.go
+./toolcalls_markup.go
+./toolcalls_parse.go
+./toolcalls_parse_markup.go
+./toolcalls_scan.go
+./toolcalls_schema_normalize.go
+./toolcalls_xml.go

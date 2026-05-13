@@ -1,0 +1,78 @@
+internal/toolcall/toolcalls_markup.go
+
+DSML 变体支持
+
+所有账号池代码集中在 5 个文件中：                                 t
+
+┌──────────────────────────────────┬────────────────────────────────────────────────────────────┐
+│               文件               │                            职责                            │
+├──────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ pool_core.go                     │ Pool 结构体、NewPool、Reset、Release、Status               │
+├──────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ pool_acquire.go                  │ Acquire、AcquireWait、tryAcquire、bumpQueue — 核心轮询逻辑 │
+├──────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ pool_limits.go                   │ 并发数上限、环境变量解析                                   │
+├──────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ pool_waiters.go                  │ 等待者 FIFO 队列管理                                       │
+├──────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ pool_test.go / pool_edge_test.go │ 单元测试                                                   │
+└──────────────────────────────────┴────────────────────────────────────────────────────────────┘
+
+---
+轮询算法：FIFO + 获取后移到队尾
+
+pool_acquire.go — tryAcquire（第66行）:
+
+func (p *Pool) tryAcquire(exclude map[string]bool) (string, bool) {
+    for _, id := range p.queue {       // 从头遍历 FIFO 队列
+        if exclude[id] { continue }    // 跳过排除的账号
+        if p.inUse[id] >= p.maxInflightPerAccount { continue } // 跳过已达并发上限的
+        p.inUse[id]++                  // 占用一个并发槽
+        p.bumpQueue(id)                // 移到队尾 → 其他账号向前推进
+        return id, true
+    }
+    return "", false
+}
+
+pool_acquire.go — bumpQueue（第83行）:
+
+func (p *Pool) bumpQueue(id string) {
+    // 从当前位置移除
+    for i, qid := range p.queue {
+        if qid == id { p.queue = append(p.queue[:i], p.queue[i+1:]...); break }
+    }
+    // 追加到队尾
+    p.queue = append(p.queue, id)
+}
+
+这不是传统的循环指针 Round-Robin，而是"获取后移到末尾"的自组织 FIFO。
+效果等价于均匀轮询——刚用过的账号排到最后，其他账号依次前移。
+
+---
+调用链
+
+DeepSeek API 认证失败
+  → client_auth.go: SwitchAccount()
+    → pool.AcquireWait(ctx, target, exclude)
+      → pool.acquireLocked()
+        → pool.tryAcquire()       ← 遍历队列选第一个可用账号
+        → pool.bumpQueue(id)      ← 移到队尾
+        → return id
+    → 用新账号重试请求
+请求完成
+  → pool.Release(id)              ← 释放并发槽，通知等待者
+
+---
+并发控制
+
+┌─────────────────────────────┬──────────────────┬──────────────────────┐
+│          环境变量           │      默认值      │         说明         │
+├─────────────────────────────┼──────────────────┼──────────────────────┤
+│ DS2API_ACCOUNT_MAX_INFLIGHT │ 2                │ 每账号最大并发请求数 │
+├─────────────────────────────┼──────────────────┼──────────────────────┤
+│ DS2API_ACCOUNT_MAX_QUEUE    │ accountCount × 2 │ 等待队列最大长度     │
+├─────────────────────────────┼──────────────────┼──────────────────────┤
+│ DS2API_GLOBAL_MAX_INFLIGHT  │ accountCount × 2 │ 全局最大并发         │
+└─────────────────────────────┴──────────────────┴──────────────────────┘
+
+Release 释放槽位后通知 FIFO 等待者队列中的第一个等待者。

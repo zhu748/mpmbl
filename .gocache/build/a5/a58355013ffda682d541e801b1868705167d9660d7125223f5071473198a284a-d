@@ -1,0 +1,14 @@
+# test log
+getenv GOTMPDIR
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\.tmp-my-sample-01-c33ae2bad76a40a6a3890554abb58c87
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001
+open C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\.tmp-my-sample-01-c33ae2bad76a40a6a3890554abb58c87\upstream.stream.sse
+open C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\.tmp-my-sample-01-c33ae2bad76a40a6a3890554abb58c87\meta.json
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01\upstream.stream.sse
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01\openai.stream.sse
+stat C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01\openai.output.txt
+open C:\Users\ADMINI~1\AppData\Local\Temp\TestPersistWritesSampleFilesAndMeta1353711639\001\my-sample-01\meta.json
+open C:\Users\ADMINI~1\AppData\Local\Temp

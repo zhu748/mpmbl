@@ -1,0 +1,15 @@
+# test log
+stat ..\..\tests\compat\fixtures\sse_chunks
+open ..\..\tests\compat\fixtures\sse_chunks
+open ..\..\tests\compat\fixtures\sse_chunks\content_filter_status.json
+open ..\..\tests\compat\expected\sse_content_filter_status.json
+open ..\..\tests\compat\fixtures\sse_chunks\fragments_append.json
+open ..\..\tests\compat\expected\sse_fragments_append.json
+open ..\..\tests\compat\fixtures\sse_chunks\leaked_content_filter.json
+open ..\..\tests\compat\expected\sse_leaked_content_filter.json
+open ..\..\tests\compat\fixtures\sse_chunks\nested_finished.json
+open ..\..\tests\compat\expected\sse_nested_finished.json
+open ..\..\tests\compat\fixtures\sse_chunks\split_tool_json.json
+open ..\..\tests\compat\expected\sse_split_tool_json.json
+open ..\..\tests\compat\fixtures\token_cases.json
+open ..\..\tests\compat\expected\token_cases.json

@@ -1,0 +1,4 @@
+./constants.go
+./sse.go
+./constants_test.go
+./sse_test.go

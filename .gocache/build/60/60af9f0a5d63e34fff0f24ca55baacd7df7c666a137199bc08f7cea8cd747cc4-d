@@ -1,0 +1,9 @@
+./tool_sieve_core.go
+./tool_sieve_jsonscan.go
+./tool_sieve_state.go
+./tool_sieve_xml.go
+./tool_sieve_xml_scan.go
+./tool_sieve_xml_tags.go
+./complex_edge_test.go
+./fence_edge_sieve_test.go
+./tool_sieve_xml_test.go

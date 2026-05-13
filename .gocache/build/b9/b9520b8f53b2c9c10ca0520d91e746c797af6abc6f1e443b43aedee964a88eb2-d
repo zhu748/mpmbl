@@ -1,0 +1,13 @@
+./client_auth.go
+./client_completion.go
+./client_continue.go
+./client_core.go
+./client_file_status.go
+./client_http_helpers.go
+./client_http_json.go
+./client_session.go
+./client_session_delete.go
+./client_upload.go
+./errors.go
+./pow.go
+./proxy.go

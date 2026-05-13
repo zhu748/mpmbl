@@ -1,0 +1,3 @@
+./gemini-cli_claude_request.go
+./gemini-cli_claude_response.go
+./init.go

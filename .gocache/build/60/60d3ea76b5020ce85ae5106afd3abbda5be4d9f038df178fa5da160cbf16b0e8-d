@@ -1,0 +1,4 @@
+./bridge.go
+./stream_writer.go
+./bridge_test.go
+./stream_writer_test.go

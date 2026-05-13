@@ -1,0 +1,11 @@
+./bpe.go
+./cl100k_base.go
+./claude.go
+./codec.go
+./encoding.go
+./gpt2.go
+./o200k_base.go
+./p50k_base.go
+./p50k_edit.go
+./r50k_base.go
+./tiktoken.go
