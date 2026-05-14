@@ -19,8 +19,8 @@ func TestStoreHistorySplitAccessors(t *testing.T) {
 
 func TestStoreCurrentInputFileAccessors(t *testing.T) {
 	store := &Store{cfg: Config{}}
-	if !store.CurrentInputFileEnabled() {
-		t.Fatal("expected current input file enabled by default")
+	if store.CurrentInputFileEnabled() {
+		t.Fatal("expected current input file disabled by default")
 	}
 	if got := store.CurrentInputFileMinChars(); got != 0 {
 		t.Fatalf("default current input file min_chars=%d want=0", got)
@@ -44,7 +44,7 @@ func TestStoreCurrentInputFileAccessors(t *testing.T) {
 	historyEnabled := true
 	store.cfg.HistorySplit.Enabled = &historyEnabled
 	if !store.CurrentInputFileEnabled() {
-		t.Fatal("expected history split config to not suppress current input file mode")
+		t.Fatal("expected history split config to not affect current input file mode")
 	}
 }
 

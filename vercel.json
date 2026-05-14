@@ -82,6 +82,18 @@
       "destination": "/api/index"
     },
     {
+      "source": "/admin/chat-history/settings",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin/chat-history/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin/chat-history",
+      "destination": "/api/index"
+    },
+    {
       "source": "/admin",
       "destination": "/admin/index.html"
     },

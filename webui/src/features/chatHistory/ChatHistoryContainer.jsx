@@ -126,6 +126,19 @@ function downloadTextFile(filename, text) {
     URL.revokeObjectURL(url)
 }
 
+async function parseJSONResponse(res, fallbackMessage) {
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('application/json')) {
+        return res.json()
+    }
+    const rawText = await res.text()
+    const text = String(rawText || '').trim()
+    if (text && !text.startsWith('<!DOCTYPE') && !text.startsWith('<html')) {
+        throw new Error(text)
+    }
+    throw new Error(fallbackMessage)
+}
+
 function fallbackCopyText(text) {
     const textArea = document.createElement('textarea')
     textArea.value = text
@@ -657,7 +670,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
             if (res.status === 304) {
                 return
             }
-            const data = await res.json()
+            const data = await parseJSONResponse(res, t('chatHistory.loadFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.loadFailed'))
             }
@@ -692,7 +705,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
             if (res.status === 304) {
                 return
             }
-            const data = await res.json()
+            const data = await parseJSONResponse(res, t('chatHistory.loadFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.loadFailed'))
             }
@@ -790,7 +803,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ limit: nextLimit }),
             })
-            const data = await res.json()
+            const data = await parseJSONResponse(res, t('chatHistory.updateLimitFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.updateLimitFailed'))
             }
@@ -816,7 +829,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
         setDeletingId(id)
         try {
             const res = await apiFetch(`/admin/chat-history/${encodeURIComponent(id)}`, { method: 'DELETE' })
-            const data = await res.json()
+            const data = await parseJSONResponse(res, t('chatHistory.deleteFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.deleteFailed'))
             }
@@ -838,7 +851,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
         setClearing(true)
         try {
             const res = await apiFetch('/admin/chat-history', { method: 'DELETE' })
-            const data = await res.json()
+            const data = await parseJSONResponse(res, t('chatHistory.clearFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.clearFailed'))
             }
