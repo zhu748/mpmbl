@@ -26,3 +26,23 @@ func TestContainerDefaultConfigPath(t *testing.T) {
 		}
 	})
 }
+
+func TestChatHistoryPathUsesTmpOnVercelByDefault(t *testing.T) {
+	t.Setenv("VERCEL", "1")
+	t.Setenv("NOW_REGION", "")
+	t.Setenv("DS2API_CHAT_HISTORY_PATH", "")
+
+	if got := ChatHistoryPath(); got != "/tmp/ds2api/chat_history.json" {
+		t.Fatalf("ChatHistoryPath() = %q, want %q", got, "/tmp/ds2api/chat_history.json")
+	}
+}
+
+func TestChatHistoryPathPrefersExplicitEnvOnVercel(t *testing.T) {
+	t.Setenv("VERCEL", "1")
+	t.Setenv("NOW_REGION", "")
+	t.Setenv("DS2API_CHAT_HISTORY_PATH", `C:\custom\chat_history.json`)
+
+	if got := ChatHistoryPath(); got != `C:\custom\chat_history.json` {
+		t.Fatalf("ChatHistoryPath() = %q, want %q", got, `C:\custom\chat_history.json`)
+	}
+}

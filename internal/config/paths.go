@@ -58,6 +58,11 @@ func RawStreamSampleRoot() string {
 }
 
 func ChatHistoryPath() string {
+	if strings.TrimSpace(os.Getenv("DS2API_CHAT_HISTORY_PATH")) == "" && IsVercel() {
+		// Vercel runtime filesystem is read-only outside /tmp.
+		// Use ephemeral /tmp storage so admin history can still work within a live instance.
+		return "/tmp/ds2api/chat_history.json"
+	}
 	return ResolvePath("DS2API_CHAT_HISTORY_PATH", "data/chat_history.json")
 }
 
