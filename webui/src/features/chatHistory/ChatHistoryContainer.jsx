@@ -591,6 +591,19 @@ function DetailConversation({ selectedItem, t, viewMode, detailScrollRef, assist
     )
 }
 
+
+
+async function safeParseJSONResponse(res, fallbackMessage) {
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase()
+    if (!contentType.includes('application/json')) {
+        throw new Error(fallbackMessage)
+    }
+    try {
+        return await res.json()
+    } catch {
+        throw new Error(fallbackMessage)
+    }
+}
 export default function ChatHistoryContainer({ authFetch, onMessage }) {
     const { t, lang } = useI18n()
     const apiFetch = authFetch || fetch
@@ -657,7 +670,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
             if (res.status === 304) {
                 return
             }
-            const data = await res.json()
+            const data = await safeParseJSONResponse(res, t('chatHistory.loadFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.loadFailed'))
             }
@@ -692,7 +705,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
             if (res.status === 304) {
                 return
             }
-            const data = await res.json()
+            const data = await safeParseJSONResponse(res, t('chatHistory.loadFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.loadFailed'))
             }
@@ -790,7 +803,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ limit: nextLimit }),
             })
-            const data = await res.json()
+            const data = await safeParseJSONResponse(res, t('chatHistory.updateLimitFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.updateLimitFailed'))
             }
@@ -816,7 +829,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
         setDeletingId(id)
         try {
             const res = await apiFetch(`/admin/chat-history/${encodeURIComponent(id)}`, { method: 'DELETE' })
-            const data = await res.json()
+            const data = await safeParseJSONResponse(res, t('chatHistory.deleteFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.deleteFailed'))
             }
@@ -838,7 +851,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
         setClearing(true)
         try {
             const res = await apiFetch('/admin/chat-history', { method: 'DELETE' })
-            const data = await res.json()
+            const data = await safeParseJSONResponse(res, t('chatHistory.clearFailed'))
             if (!res.ok) {
                 throw new Error(data?.detail || t('chatHistory.clearFailed'))
             }

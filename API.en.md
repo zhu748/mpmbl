@@ -712,7 +712,7 @@ Reads runtime settings and status, including:
 - `compat` (`wide_input_strict_output`, `strip_reference_markers`)
 - `responses` / `embeddings`
 - `auto_delete` (`mode`: `none` / `single` / `all`; legacy `sessions=true` is still treated as `all`)
-- `current_input_file` (`enabled` defaults to `true`, plus `min_chars`)
+- `current_input_file` (`enabled` defaults to `false`, plus `min_chars`)
 - `model_aliases`
 - `env_backed`, `needs_vercel_sync`
 - `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings

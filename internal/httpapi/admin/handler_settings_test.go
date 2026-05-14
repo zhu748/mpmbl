@@ -58,8 +58,8 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 	var body map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	currentInputFile, _ := body["current_input_file"].(map[string]any)
-	if got := boolFrom(currentInputFile["enabled"]); !got {
-		t.Fatalf("expected current_input_file.enabled=true, body=%v", body)
+	if got := boolFrom(currentInputFile["enabled"]); got {
+		t.Fatalf("expected current_input_file.enabled=false, body=%v", body)
 	}
 	if got := intFrom(currentInputFile["min_chars"]); got != 0 {
 		t.Fatalf("expected current_input_file.min_chars=0, got %d body=%v", got, body)
@@ -200,7 +200,7 @@ func TestUpdateSettingsCurrentInputFile(t *testing.T) {
 	}
 	snap := h.Store.Snapshot()
 	if snap.CurrentInputFile.Enabled == nil || !*snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file.enabled=true, got %#v", snap.CurrentInputFile)
+		t.Fatalf("expected current_input_file.enabled=false, got %#v", snap.CurrentInputFile)
 	}
 	if snap.CurrentInputFile.MinChars != 12345 {
 		t.Fatalf("expected current_input_file.min_chars=12345, got %#v", snap.CurrentInputFile)
@@ -252,7 +252,7 @@ func TestUpdateSettingsCurrentInputFilePartialUpdatePreservesMinChars(t *testing
 	}
 	snap := h.Store.Snapshot()
 	if snap.CurrentInputFile.Enabled == nil || !*snap.CurrentInputFile.Enabled {
-		t.Fatalf("expected current_input_file.enabled=true, got %#v", snap.CurrentInputFile.Enabled)
+		t.Fatalf("expected current_input_file.enabled=false, got %#v", snap.CurrentInputFile.Enabled)
 	}
 	if snap.CurrentInputFile.MinChars != 777 {
 		t.Fatalf("expected current_input_file.min_chars to remain 777, got %#v", snap.CurrentInputFile)
