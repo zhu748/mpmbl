@@ -9,6 +9,7 @@ import "strings"
 // The toolNames slice should contain the actual tool names available in the
 // current request; the function picks real names for examples.
 func BuildToolCallInstructions(toolNames []string) string {
+	names := uniqueToolNames(toolNames)
 	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
 
 <|DSML|tool_calls>
@@ -33,7 +34,12 @@ RULES:
 12) Do NOT wrap XML in markdown fences. Do NOT output explanations, role markers, or internal monologue.
 13) If you call a tool, the first non-whitespace characters of that tool block must be exactly <|DSML|tool_calls>.
 14) Never omit the opening <|DSML|tool_calls> tag, even if you already plan to close with </|DSML|tool_calls>.
-15) Compatibility note: the runtime also accepts the legacy XML tags <tool_calls> / <invoke> / <parameter>, but prefer the DSML-prefixed form above.
+15) Output ONLY the canonical DSML form shown above. Do not intentionally switch to DMSL, lowercase aliases, hyphen/underscore aliases, hash/star pipe aliases, or the legacy <tool_calls> / <invoke> / <parameter> tags.
+16) Compatibility note: the runtime may recover some malformed or legacy variants, but that recovery exists only as a fallback. Your job is to emit the exact canonical DSML form on the first try.
+17) If you call a tool, end your response immediately after </|DSML|tool_calls>. Do not add any trailing prose.
+
+AVAILABLE TOOL NAMES (case-sensitive, use exactly as listed):
+` + buildAvailableToolNamesSection(names) + `
 
 PARAMETER SHAPES:
 - string => <|DSML|parameter name="x"><![CDATA[value]]></|DSML|parameter>
@@ -58,9 +64,20 @@ Wrong 4 — empty parameters:
       <|DSML|parameter name="command"></|DSML|parameter>
     </|DSML|invoke>
   </|DSML|tool_calls>
+Wrong 5 — using compatibility aliases instead of canonical DSML:
+  <|DMSL|tool_calls>...</|DMSL|tool_calls>
+  <tool_calls>...</tool_calls>
+  <dmsl-tool_calls>...</dmsl-tool_calls>
+
+FINAL CHECK BEFORE SENDING A TOOL CALL:
+- The tool name exactly matches one available tool name, including case.
+- Every parameter name exactly matches the schema.
+- Every string value is wrapped in <![CDATA[...]]>.
+- There is no prose before or after the tool block.
+- The response ends immediately after </|DSML|tool_calls>.
 
 Remember: The ONLY valid way to use tools is the <|DSML|tool_calls>...</|DSML|tool_calls> block at the end of your response.
-` + buildCorrectToolExamples(toolNames)
+` + buildCorrectToolExamples(names)
 }
 
 type promptToolExample struct {
@@ -106,6 +123,17 @@ func uniqueToolNames(toolNames []string) []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+func buildAvailableToolNamesSection(names []string) string {
+	if len(names) == 0 {
+		return "- (No tool names supplied in this request. If tools are unavailable, answer normally instead of fabricating a tool call.)"
+	}
+	lines := make([]string, 0, len(names))
+	for _, name := range names {
+		lines = append(lines, "- "+name)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func firstBasicExample(names []string) (promptToolExample, bool) {

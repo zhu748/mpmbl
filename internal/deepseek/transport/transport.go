@@ -21,6 +21,20 @@ type Client struct {
 	http *http.Client
 }
 
+type fingerprintProfile struct {
+	name          string
+	helloID       utls.ClientHelloID
+	alpnProtocols []string
+}
+
+var defaultTLSFingerprintProfiles = []fingerprintProfile{
+	{name: "android-okhttp", helloID: utls.HelloAndroid_11_OkHttp, alpnProtocols: []string{"h2", "http/1.1"}},
+	{name: "chrome-auto", helloID: utls.HelloChrome_Auto, alpnProtocols: []string{"h2", "http/1.1"}},
+	{name: "safari-auto", helloID: utls.HelloSafari_Auto, alpnProtocols: []string{"h2", "http/1.1"}},
+	{name: "randomized-alpn", helloID: utls.HelloRandomizedALPN, alpnProtocols: []string{"h2", "http/1.1"}},
+	{name: "randomized-no-alpn", helloID: utls.HelloRandomizedNoALPN, alpnProtocols: []string{"http/1.1"}},
+}
+
 func New(timeout time.Duration) *Client {
 	return NewWithDialContext(timeout, nil)
 }
@@ -31,12 +45,12 @@ func NewWithDialContext(timeout time.Duration, dialContext DialContextFunc) *Cli
 		dialContext = (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 	}
 	base := &http.Transport{
-		ForceAttemptHTTP2:   false,
+		ForceAttemptHTTP2:   true,
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 100,
 		IdleConnTimeout:     90 * time.Second,
 		DialContext:         dialContext,
-		DialTLSContext:      safariTLSDialer(dialContext),
+		DialTLSContext:      fingerprintTLSDialer(dialContext, defaultTLSFingerprintProfiles),
 		TLSClientConfig:     &tls.Config{MinVersion: tls.VersionTLS12},
 	}
 	if useEnvProxy {
@@ -55,7 +69,7 @@ func NewFallbackClient(timeout time.Duration, dialContext DialContextFunc) *http
 		dialContext = (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 	}
 	base := &http.Transport{
-		ForceAttemptHTTP2:   false,
+		ForceAttemptHTTP2:   true,
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 100,
 		IdleConnTimeout:     90 * time.Second,
@@ -68,36 +82,48 @@ func NewFallbackClient(timeout time.Duration, dialContext DialContextFunc) *http
 	return &http.Client{Timeout: timeout, Transport: base}
 }
 
-func safariTLSDialer(dialContext DialContextFunc) func(ctx context.Context, network, addr string) (net.Conn, error) {
+func fingerprintTLSDialer(dialContext DialContextFunc, profiles []fingerprintProfile) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	if dialContext == nil {
 		dialContext = (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 	}
+	if len(profiles) == 0 {
+		profiles = defaultTLSFingerprintProfiles
+	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		plainConn, err := dialContext(ctx, network, addr)
-		if err != nil {
-			return nil, err
-		}
 		host, _, _ := net.SplitHostPort(addr)
-		uCfg := &utls.Config{ServerName: host}
-		uConn := utls.UClient(plainConn, uCfg, utls.HelloSafari_Auto)
-		if err := forceHTTP11ALPN(uConn); err != nil {
-			_ = plainConn.Close()
-			return nil, err
+		var errs []error
+		for _, profile := range profiles {
+			plainConn, err := dialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			uCfg := &utls.Config{ServerName: host}
+			uConn := utls.UClient(plainConn, uCfg, profile.helloID)
+			if err := forceALPN(uConn, profile.alpnProtocols); err != nil {
+				_ = plainConn.Close()
+				errs = append(errs, fmt.Errorf("%s build handshake: %w", profile.name, err))
+				continue
+			}
+			if err := uConn.HandshakeContext(ctx); err != nil {
+				_ = plainConn.Close()
+				errs = append(errs, fmt.Errorf("%s handshake: %w", profile.name, err))
+				continue
+			}
+			if negotiated := uConn.ConnectionState().NegotiatedProtocol; !allowedNegotiatedALPN(negotiated, profile.alpnProtocols) {
+				_ = uConn.Close()
+				errs = append(errs, fmt.Errorf("%s negotiated unexpected ALPN protocol: %s", profile.name, negotiated))
+				continue
+			}
+			return uConn, nil
 		}
-		err = uConn.HandshakeContext(ctx)
-		if err != nil {
-			_ = plainConn.Close()
-			return nil, err
-		}
-		if negotiated := uConn.ConnectionState().NegotiatedProtocol; negotiated != "" && negotiated != "http/1.1" {
-			_ = uConn.Close()
-			return nil, fmt.Errorf("unexpected ALPN protocol negotiated: %s", negotiated)
-		}
-		return uConn, nil
+		return nil, joinDialErrors(addr, errs)
 	}
 }
 
-func forceHTTP11ALPN(uConn *utls.UConn) error {
+func forceALPN(uConn *utls.UConn, protocols []string) error {
+	if len(protocols) == 0 {
+		protocols = []string{"http/1.1"}
+	}
 	if err := uConn.BuildHandshakeState(); err != nil {
 		return err
 	}
@@ -106,8 +132,34 @@ func forceHTTP11ALPN(uConn *utls.UConn) error {
 		if !ok {
 			continue
 		}
-		alpnExt.AlpnProtocols = []string{"http/1.1"}
+		alpnExt.AlpnProtocols = append([]string(nil), protocols...)
 		return nil
 	}
 	return nil
+}
+
+func allowedNegotiatedALPN(negotiated string, allowed []string) bool {
+	if negotiated == "" {
+		return true
+	}
+	for _, candidate := range allowed {
+		if negotiated == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func joinDialErrors(addr string, errs []error) error {
+	if len(errs) == 0 {
+		return fmt.Errorf("tls fingerprint dial failed for %s", addr)
+	}
+	msg := "tls fingerprint dial failed for " + addr
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		msg += "; " + err.Error()
+	}
+	return fmt.Errorf(msg)
 }
