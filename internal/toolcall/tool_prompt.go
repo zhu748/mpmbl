@@ -31,7 +31,7 @@ RULES:
 9) Fill parameters with the actual values required for this call. Do not emit placeholder, blank, or whitespace-only parameters.
 10) If a required parameter value is unknown, ask the user or answer normally instead of outputting an empty tool call.
 11) For shell tools such as Bash / execute_command, the command/script must be inside the command parameter. Never call them with an empty command.
-12) Do NOT wrap XML in markdown fences. Do NOT output explanations, role markers, or internal monologue.
+12) Do NOT wrap XML in markdown fences. Do NOT output explanations, role markers, internal monologue, progress reports, stage headers, or command previews outside the tool block.
 13) If you call a tool, the first non-whitespace characters of that tool block must be exactly <|DSML|tool_calls>.
 14) Never omit the opening <|DSML|tool_calls> tag, even if you already plan to close with </|DSML|tool_calls>.
 15) Output ONLY the canonical DSML form shown above. Do not intentionally switch to DMSL, lowercase aliases, hyphen/underscore aliases, hash/star pipe aliases, or the legacy <tool_calls> / <invoke> / <parameter> tags.
@@ -75,6 +75,7 @@ FINAL CHECK BEFORE SENDING A TOOL CALL:
 - Every string value is wrapped in <![CDATA[...]]>.
 - There is no prose before or after the tool block.
 - The response ends immediately after </|DSML|tool_calls>.
+- There are no phase summaries, status notes, or standalone command lines before <|DSML|tool_calls>.
 
 Remember: The ONLY valid way to use tools is the <|DSML|tool_calls>...</|DSML|tool_calls> block at the end of your response.
 ` + buildCorrectToolExamples(names)

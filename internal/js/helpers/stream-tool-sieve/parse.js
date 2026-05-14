@@ -9,6 +9,9 @@ const {
   containsToolCallWrapperSyntaxOutsideIgnored,
   sanitizeLooseCDATA,
 } = require('./parse_payload');
+const {
+  shellCommandLooksPolluted,
+} = require('./shell_safety');
 
 function extractToolNames(tools) {
   if (!Array.isArray(tools) || tools.length === 0) {
@@ -113,10 +116,14 @@ function filterToolCallsDetailed(parsed, toolNames) {
     if (!tc || !tc.name) {
       continue;
     }
-    calls.push({
+    const normalized = {
       name: tc.name,
       input: tc.input && typeof tc.input === 'object' && !Array.isArray(tc.input) ? tc.input : {},
-    });
+    };
+    if (shellCommandLooksPolluted(normalized)) {
+      continue;
+    }
+    calls.push(normalized);
   }
   return { calls, rejectedToolNames: [] };
 }

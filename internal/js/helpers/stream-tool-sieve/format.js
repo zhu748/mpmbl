@@ -1,6 +1,9 @@
 'use strict';
 
 const crypto = require('crypto');
+const {
+  shellCommandLooksPolluted,
+} = require('./shell_safety');
 
 function formatOpenAIStreamToolCalls(calls, idStore, toolsRaw) {
   if (!Array.isArray(calls) || calls.length === 0) {
@@ -23,24 +26,28 @@ function normalizeParsedToolCallsForSchemas(calls, toolsRaw) {
     return calls;
   }
   const schemas = buildToolSchemaIndex(toolsRaw);
-  if (!schemas) {
-    return calls;
-  }
   let changedAny = false;
-  const out = calls.map((call) => {
-    const name = String(call && call.name || '').trim().toLowerCase();
-    const schema = schemas[name];
-    if (!schema || !call || !call.input || typeof call.input !== 'object' || Array.isArray(call.input)) {
-      return call;
+  const out = [];
+  for (const call of calls) {
+    let current = call;
+    if (schemas) {
+      const name = String(call && call.name || '').trim().toLowerCase();
+      const schema = schemas[name];
+      if (schema && call && call.input && typeof call.input === 'object' && !Array.isArray(call.input)) {
+        const [normalized, changed] = normalizeToolValueWithSchema(call.input, schema);
+        if (changed && normalized && typeof normalized === 'object' && !Array.isArray(normalized)) {
+          changedAny = true;
+          current = { ...call, input: normalized };
+        }
+      }
     }
-    const [normalized, changed] = normalizeToolValueWithSchema(call.input, schema);
-    if (!changed || !normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
-      return call;
+    if (shellCommandLooksPolluted(current)) {
+      changedAny = true;
+      continue;
     }
-    changedAny = true;
-    return { ...call, input: normalized };
-  });
-  return changedAny ? out : calls;
+    out.push(current);
+  }
+  return changedAny || out.length !== calls.length ? out : calls;
 }
 
 function buildToolSchemaIndex(toolsRaw) {

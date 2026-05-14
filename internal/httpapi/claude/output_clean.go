@@ -1,13 +1,7 @@
 package claude
 
-import textclean "ds2api/internal/textclean"
+import openaishared "ds2api/internal/httpapi/openai/shared"
 
 func cleanVisibleOutput(text string, stripReferenceMarkers bool) string {
-	if text == "" {
-		return text
-	}
-	if stripReferenceMarkers {
-		text = textclean.StripReferenceMarkers(text)
-	}
-	return text
+	return openaishared.CleanVisibleOutput(text, stripReferenceMarkers)
 }

@@ -195,6 +195,18 @@ func TestBuildToolCallInstructions_UsesPositiveTagPunctuationAlphabet(t *testing
 	}
 }
 
+func TestBuildToolCallInstructions_ExplicitlyRejectsPhaseReportsAndCommandPreviews(t *testing.T) {
+	out := BuildToolCallInstructions([]string{"PowerShell"})
+	for _, want := range []string{
+		"progress reports, stage headers, or command previews outside the tool block",
+		"There are no phase summaries, status notes, or standalone command lines before <|DSML|tool_calls>.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected stronger no-preamble guidance %q, got: %s", want, out)
+		}
+	}
+}
+
 func findInvokeBlocks(text, name string) []string {
 	open := `<|DSML|invoke name="` + name + `">`
 	remaining := text

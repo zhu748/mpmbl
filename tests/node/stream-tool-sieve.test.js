@@ -212,6 +212,13 @@ test('formatOpenAIStreamToolCalls preserves arrays when schema says array', () =
   assert.deepEqual(args.todos, todos);
 });
 
+test('formatOpenAIStreamToolCalls drops polluted shell command calls', () => {
+  const formatted = formatOpenAIStreamToolCalls([
+    { name: 'PowerShell', input: { command: 'cd e:\\ces\nAlso check if MATLAB engine for Python is available (alternative)\npython -c "import matlab.engine"' } },
+  ], new Map(), []);
+  assert.equal(formatted.length, 0);
+});
+
 test('parseToolCalls treats CDATA object fragment as object', () => {
   const fragment = '<question><![CDATA[Pick one]]></question><options><item><label><![CDATA[A]]></label></item><item><label><![CDATA[B]]></label></item></options>';
   const payload = `<tool_calls><invoke name="AskUserQuestion"><parameter name="questions"><![CDATA[${fragment}]]></parameter></invoke></tool_calls>`;
@@ -233,6 +240,37 @@ test('parseToolCalls normalizes mixed DSML and XML tool tags', () => {
   assert.equal(calls.length, 1);
   assert.equal(calls[0].name, 'read_file');
   assert.deepEqual(calls[0].input, { path: 'README.MD' });
+});
+
+test('parseToolCalls drops polluted shell command calls', () => {
+  const payload = [
+    '<|DSML|tool_calls>',
+    '<|DSML|invoke name="PowerShell">',
+    '<|DSML|parameter name="command"><![CDATA[cd e:\\ces',
+    'Also check if MATLAB engine for Python is available (alternative)',
+    'python -c "import matlab.engine"',
+    ']]></|DSML|parameter>',
+    '</|DSML|invoke>',
+    '</|DSML|tool_calls>',
+  ].join('\n');
+  const calls = parseToolCalls(payload, ['PowerShell']);
+  assert.equal(calls.length, 0);
+});
+
+test('parseToolCalls keeps commented shell guidance lines', () => {
+  const payload = [
+    '<|DSML|tool_calls>',
+    '<|DSML|invoke name="PowerShell">',
+    '<|DSML|parameter name="command"><![CDATA[cd e:\\ces',
+    '# Also check if MATLAB engine for Python is available (alternative)',
+    'python -c "import matlab.engine"',
+    ']]></|DSML|parameter>',
+    '</|DSML|invoke>',
+    '</|DSML|tool_calls>',
+  ].join('\n');
+  const calls = parseToolCalls(payload, ['PowerShell']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].input.command.includes('# Also check'), true);
 });
 
 test('parseToolCalls skips prose mention of same wrapper variant', () => {

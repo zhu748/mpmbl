@@ -8,6 +8,7 @@ import (
 var emptyJSONFencePattern = regexp.MustCompile("(?is)```json\\s*```")
 var leakedToolCallArrayPattern = regexp.MustCompile(`(?is)\[\{\s*"function"\s*:\s*\{[\s\S]*?\}\s*,\s*"id"\s*:\s*"call[^"]*"\s*,\s*"type"\s*:\s*"function"\s*}\]`)
 var leakedToolResultBlobPattern = regexp.MustCompile(`(?is)<\s*\|\s*tool\s*\|\s*>\s*\{[\s\S]*?"tool_call_id"\s*:\s*"call[^"]*"\s*}`)
+var leakedToolWrapperBlockPattern = regexp.MustCompile(`(?is)<[^>\r\n]{0,48}tool_calls\b[^>]*>[\s\S]*?</[^>\r\n]{0,48}tool_calls\s*>`)
 
 var leakedThinkTagPattern = regexp.MustCompile(`(?is)</?\s*think\s*>`)
 
@@ -43,6 +44,7 @@ func sanitizeLeakedOutput(text string) string {
 	out := emptyJSONFencePattern.ReplaceAllString(text, "")
 	out = leakedToolCallArrayPattern.ReplaceAllString(out, "")
 	out = leakedToolResultBlobPattern.ReplaceAllString(out, "")
+	out = leakedToolWrapperBlockPattern.ReplaceAllString(out, "")
 	out = stripDanglingThinkSuffix(out)
 	out = leakedThinkTagPattern.ReplaceAllString(out, "")
 	out = leakedBOSMarkerPattern.ReplaceAllString(out, "")

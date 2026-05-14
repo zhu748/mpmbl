@@ -159,3 +159,29 @@ func TestNormalizeParsedToolCallsForSchemasPreservesArrayWhenSchemaSaysArray(t *
 		t.Fatalf("expected todos array preserved, got %#v want %#v", got[0].Input["todos"], todos)
 	}
 }
+
+func TestNormalizeParsedToolCallsForSchemasDropsPollutedShellCommandCall(t *testing.T) {
+	calls := []ParsedToolCall{{
+		Name: "PowerShell",
+		Input: map[string]any{
+			"command": "cd e:\\ces\nAlso check if MATLAB engine for Python is available (alternative)\npython -c \"import matlab.engine\"",
+		},
+	}}
+	got := NormalizeParsedToolCallsForSchemas(calls, nil)
+	if len(got) != 0 {
+		t.Fatalf("expected polluted shell command call to be dropped, got %#v", got)
+	}
+}
+
+func TestNormalizeParsedToolCallsForSchemasKeepsShellCommentLines(t *testing.T) {
+	calls := []ParsedToolCall{{
+		Name: "PowerShell",
+		Input: map[string]any{
+			"command": "cd e:\\ces\n# Also check if MATLAB engine for Python is available (alternative)\npython -c \"import matlab.engine\"",
+		},
+	}}
+	got := NormalizeParsedToolCallsForSchemas(calls, nil)
+	if len(got) != 1 {
+		t.Fatalf("expected commented shell guidance to remain valid, got %#v", got)
+	}
+}

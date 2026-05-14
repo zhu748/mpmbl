@@ -10,28 +10,28 @@ func NormalizeParsedToolCallsForSchemas(calls []ParsedToolCall, toolsRaw any) []
 		return calls
 	}
 	schemas := buildToolSchemaIndex(toolsRaw)
-	if len(schemas) == 0 {
-		return calls
-	}
-
+	out := make([]ParsedToolCall, 0, len(calls))
 	var changedAny bool
-	out := make([]ParsedToolCall, len(calls))
-	for i, call := range calls {
-		out[i] = call
-		schema, ok := schemas[strings.ToLower(strings.TrimSpace(call.Name))]
-		if !ok || call.Input == nil {
+	for _, call := range calls {
+		current := call
+		if len(schemas) > 0 && call.Input != nil {
+			if schema, ok := schemas[strings.ToLower(strings.TrimSpace(call.Name))]; ok {
+				normalized, changed := normalizeToolValueWithSchema(call.Input, schema)
+				if changed {
+					changedAny = true
+					if input, ok := normalized.(map[string]any); ok {
+						current.Input = input
+					}
+				}
+			}
+		}
+		if shellCommandLooksPolluted(current) {
+			changedAny = true
 			continue
 		}
-		normalized, changed := normalizeToolValueWithSchema(call.Input, schema)
-		if !changed {
-			continue
-		}
-		changedAny = true
-		if input, ok := normalized.(map[string]any); ok {
-			out[i].Input = input
-		}
+		out = append(out, current)
 	}
-	if !changedAny {
+	if !changedAny && len(out) == len(calls) {
 		return calls
 	}
 	return out
@@ -279,4 +279,73 @@ func firstNonNil(values ...any) any {
 		}
 	}
 	return nil
+}
+
+func shellCommandLooksPolluted(call ParsedToolCall) bool {
+	if !isShellLikeToolName(call.Name) || call.Input == nil {
+		return false
+	}
+	command, ok := firstShellCommandValue(call.Input)
+	if !ok {
+		return false
+	}
+	return containsNarrativeShellLine(command)
+}
+
+func isShellLikeToolName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "bash", "execute_command", "exec_command", "powershell", "shell", "terminal", "sh", "pwsh":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstShellCommandValue(input map[string]any) (string, bool) {
+	for _, key := range []string{"command", "cmd", "script"} {
+		value, ok := input[key]
+		if !ok {
+			continue
+		}
+		command, ok := value.(string)
+		if !ok {
+			continue
+		}
+		return command, true
+	}
+	return "", false
+}
+
+func containsNarrativeShellLine(command string) bool {
+	for _, rawLine := range strings.Split(command, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(line, "#") || strings.HasPrefix(lower, "rem ") || strings.HasPrefix(line, "::") {
+			continue
+		}
+		for _, prefix := range []string{
+			"also check ",
+			"also verify ",
+			"then check ",
+			"next check ",
+			"finally check ",
+			"stage report",
+			"phase report",
+			"阶段汇报",
+			"当前环境检查结果",
+			"当前检查结果",
+			"好的，我",
+			"我先",
+			"我将",
+			"接下来",
+		} {
+			if strings.HasPrefix(lower, prefix) || strings.HasPrefix(line, prefix) {
+				return true
+			}
+		}
+	}
+	return false
 }

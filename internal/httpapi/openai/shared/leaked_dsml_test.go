@@ -15,3 +15,11 @@ func TestSanitizeDSMLLeakedToolCalls(t *testing.T) {
 		t.Logf("WARNING: output not fully sanitized")
 	}
 }
+
+func TestSanitizeCanonicalDSMLToolBlockPreservesPreamble(t *testing.T) {
+	input := "阶段汇报 1：环境检查与选题\n<|DSML|tool_calls><|DSML|invoke name=\"PowerShell\"><|DSML|parameter name=\"command\"><![CDATA[pwd]]></|DSML|parameter></|DSML|invoke></|DSML|tool_calls>"
+	result := sanitizeLeakedOutput(input)
+	if result != "阶段汇报 1：环境检查与选题\n" {
+		t.Fatalf("expected canonical DSML tool block stripped, got %q", result)
+	}
+}
