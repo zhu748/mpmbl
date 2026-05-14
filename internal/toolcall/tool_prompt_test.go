@@ -119,6 +119,55 @@ func TestBuildToolCallInstructions_AnchorsMissingOpeningWrapperFailureMode(t *te
 	}
 }
 
+func TestBuildToolCallInstructions_ExplicitlyRejectsCompatibilityAliases(t *testing.T) {
+	out := BuildToolCallInstructions([]string{"read_file"})
+	for _, want := range []string{
+		"Output ONLY the canonical DSML form shown above.",
+		"Do not intentionally switch to DMSL",
+		"Wrong 5 — using compatibility aliases instead of canonical DSML",
+		"<|DMSL|tool_calls>...</|DMSL|tool_calls>",
+		"<tool_calls>...</tool_calls>",
+		"<dmsl-tool_calls>...</dmsl-tool_calls>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected compatibility-alias warning %q, got: %s", want, out)
+		}
+	}
+}
+
+func TestBuildToolCallInstructions_RequiresImmediateStopAfterToolBlock(t *testing.T) {
+	out := BuildToolCallInstructions([]string{"read_file"})
+	want := "If you call a tool, end your response immediately after </|DSML|tool_calls>. Do not add any trailing prose."
+	if !strings.Contains(out, want) {
+		t.Fatalf("expected trailing-prose stop rule %q, got: %s", want, out)
+	}
+}
+
+func TestBuildToolCallInstructions_ListsAvailableToolNamesCaseSensitively(t *testing.T) {
+	out := BuildToolCallInstructions([]string{"Read", "execute_command", "Read", "  "})
+	for _, want := range []string{
+		"AVAILABLE TOOL NAMES (case-sensitive, use exactly as listed):",
+		"- Read",
+		"- execute_command",
+		"The tool name exactly matches one available tool name, including case.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected available-tool-name anchor %q, got: %s", want, out)
+		}
+	}
+	if strings.Count(out, "- Read") != 1 {
+		t.Fatalf("expected deduplicated tool name list, got: %s", out)
+	}
+}
+
+func TestBuildToolCallInstructions_NoToolsSuppliedWarnsAgainstFabrication(t *testing.T) {
+	out := BuildToolCallInstructions(nil)
+	want := "- (No tool names supplied in this request. If tools are unavailable, answer normally instead of fabricating a tool call.)"
+	if !strings.Contains(out, want) {
+		t.Fatalf("expected no-tools warning %q, got: %s", want, out)
+	}
+}
+
 func TestBuildToolCallInstructions_RejectsEmptyParametersInPrompt(t *testing.T) {
 	out := BuildToolCallInstructions([]string{"Bash"})
 	for _, want := range []string{

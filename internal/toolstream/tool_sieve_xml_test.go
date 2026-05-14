@@ -488,6 +488,10 @@ func TestFindToolSegmentStartDetectsXMLToolCalls(t *testing.T) {
 	}{
 		{"tool_calls_tag", "some text <tool_calls>\n", 10},
 		{"invoke_tag_missing_wrapper", "some text <invoke name=\"read_file\">\n", 10},
+		{"dmsl_hyphenated_wrapper", "some text <dmsl-tool_calls>\n", 10},
+		{"dmsl_underscore_wrapper", "some text <dmsl_tool_calls>\n", 10},
+		{"dmsl_hash_pipe_wrapper", "some text <|#tool_calls>\n", 10},
+		{"dmsl_star_pipe_wrapper", "some text <|*tool_calls>\n", 10},
 		{"bare_tool_call_text", "prefix <tool_call>\n", -1},
 		{"xml_inside_code_fence", "```xml\n<tool_calls><invoke name=\"read_file\"></invoke></tool_calls>\n```", -1},
 		{"no_xml", "just plain text", -1},
@@ -511,6 +515,8 @@ func TestFindPartialXMLToolTagStart(t *testing.T) {
 	}{
 		{"partial_tool_calls", "Hello <tool_ca", 6},
 		{"partial_invoke", "Hello <inv", 6},
+		{"partial_dmsl_hyphenated", "Hello <dmsl-tool_ca", 6},
+		{"partial_hash_pipe", "Hello <|#tool_ca", 6},
 		{"bare_tool_call_not_held", "Hello <tool_name", -1},
 		{"partial_lt_only", "Text <", 5},
 		{"complete_tag", "Text <tool_calls>done", -1},
@@ -923,5 +929,83 @@ func TestProcessToolSieveDSMLBarePrefixVariantDoesNotLeak(t *testing.T) {
 	}
 	if toolCalls != 1 {
 		t.Fatalf("expected one tool call from DSML bare prefix variant, got %d events=%#v", toolCalls, events)
+	}
+}
+
+func TestProcessToolSieveSupportsAdditionalDMSLWrapperVariants(t *testing.T) {
+	cases := []struct {
+		name    string
+		chunks  []string
+		allowed []string
+	}{
+		{
+			name: "hyphenated wrapper",
+			chunks: []string{
+				"<dmsl-tool_calls>\n",
+				"<dmsl-invoke name=\"execute_command\">\n",
+				"<dmsl-parameter name=\"command\"><![CDATA[pwd]]></dmsl-parameter>\n",
+				"</dmsl-invoke>\n",
+				"</dmsl-tool_calls>",
+			},
+			allowed: []string{"execute_command"},
+		},
+		{
+			name: "underscore wrapper",
+			chunks: []string{
+				"<dmsl_tool_calls>\n",
+				"<dmsl_invoke name=\"execute_command\">\n",
+				"<dmsl_parameter name=\"command\"><![CDATA[pwd]]></dmsl_parameter>\n",
+				"</dmsl_invoke>\n",
+				"</dmsl_tool_calls>",
+			},
+			allowed: []string{"execute_command"},
+		},
+		{
+			name: "hash pipe wrapper",
+			chunks: []string{
+				"<|#tool_calls>\n",
+				"<|#invoke name=\"execute_command\">\n",
+				"<|#parameter name=\"command\"><![CDATA[pwd]]></|#parameter>\n",
+				"</|#invoke>\n",
+				"</|#tool_calls>",
+			},
+			allowed: []string{"execute_command"},
+		},
+		{
+			name: "star pipe wrapper",
+			chunks: []string{
+				"<|*tool_calls>\n",
+				"<|*invoke name=\"execute_command\">\n",
+				"<|*parameter name=\"command\"><![CDATA[pwd]]></|*parameter>\n",
+				"</|*invoke>\n",
+				"</|*tool_calls>",
+			},
+			allowed: []string{"execute_command"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var state State
+			var events []Event
+			for _, c := range tc.chunks {
+				events = append(events, ProcessChunk(&state, c, tc.allowed)...)
+			}
+			events = append(events, Flush(&state, tc.allowed)...)
+
+			var textContent string
+			var toolCalls int
+			for _, evt := range events {
+				textContent += evt.Content
+				toolCalls += len(evt.ToolCalls)
+			}
+
+			if strings.Contains(strings.ToLower(textContent), "tool_calls") || strings.Contains(textContent, "execute_command") {
+				t.Fatalf("variant leaked to text: %q", textContent)
+			}
+			if toolCalls != 1 {
+				t.Fatalf("expected one tool call, got %d events=%#v", toolCalls, events)
+			}
+		})
 	}
 }

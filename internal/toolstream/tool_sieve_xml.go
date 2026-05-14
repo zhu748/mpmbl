@@ -148,11 +148,8 @@ func findPartialXMLToolTagStart(s string) int {
 	if strings.Contains(tail, ">") {
 		return -1
 	}
-	lowerTail := strings.ToLower(tail)
-	for _, tag := range buildXMLPartialToolTagsToDetect() {
-		if strings.HasPrefix(tag, lowerTail) {
-			return lastLT
-		}
+	if toolcall.IsPartialToolMarkupTagPrefix(tail) {
+		return lastLT
 	}
 	return -1
 }
