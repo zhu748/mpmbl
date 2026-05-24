@@ -680,6 +680,7 @@ data: {"type":"message_stop"}
       "identifier": "user@example.com",
       "email": "user@example.com",
       "mobile": "",
+      "device_id": "optional-stable-android-device-id",
       "has_password": true,
       "has_token": true,
       "token_preview": "abcde..."
@@ -707,7 +708,7 @@ data: {"type":"message_stop"}
     {"key": "k2", "name": "备用 Key", "remark": "压测"}
   ],
   "accounts": [
-    {"email": "user@example.com", "password": "pwd", "token": ""}
+    {"email": "user@example.com", "password": "pwd", "device_id": "optional-stable-android-device-id", "token": ""}
   ],
   "model_aliases": {
     "claude-sonnet-4-6": "deepseek-v4-flash",
@@ -857,14 +858,14 @@ data: {"type":"message_stop"}
 ### `POST /admin/accounts`
 
 ```json
-{"email": "user@example.com", "password": "pwd"}
+{"email": "user@example.com", "password": "pwd", "device_id": "optional-stable-android-device-id"}
 ```
 
 **响应**：`{"success": true, "total_accounts": 6}`
 
 ### `PUT /admin/accounts/{identifier}`
 
-更新指定账号的 `name` / `remark`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。
+更新指定账号的 `name` / `remark` / `device_id`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。`device_id` 留空表示恢复为按账号稳定派生。
 
 ```json
 {"name": "主账号", "remark": "团队共享"}

@@ -1,4 +1,0 @@
-./deps.go
-./handler_chat_history.go
-./routes.go
-./handler_chat_history_test.go

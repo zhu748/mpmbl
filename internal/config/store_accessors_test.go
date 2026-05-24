@@ -50,14 +50,14 @@ func TestStoreCurrentInputFileAccessors(t *testing.T) {
 
 func TestStoreThinkingInjectionAccessors(t *testing.T) {
 	store := &Store{cfg: Config{}}
-	if !store.ThinkingInjectionEnabled() {
-		t.Fatal("expected thinking injection enabled by default")
+	if store.ThinkingInjectionEnabled() {
+		t.Fatal("expected thinking injection disabled by default")
 	}
 
-	disabled := false
-	store.cfg.ThinkingInjection.Enabled = &disabled
-	if store.ThinkingInjectionEnabled() {
-		t.Fatal("expected thinking injection disabled by explicit config")
+	enabled := true
+	store.cfg.ThinkingInjection.Enabled = &enabled
+	if !store.ThinkingInjectionEnabled() {
+		t.Fatal("expected thinking injection enabled by explicit config")
 	}
 
 	store.cfg.ThinkingInjection.Prompt = "  custom thinking prompt  "

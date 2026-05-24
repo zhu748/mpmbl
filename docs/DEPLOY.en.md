@@ -267,6 +267,11 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_VERCEL_INTERNAL_SECRET` | Hybrid streaming internal auth | Falls back to `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL | `900` |
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | Raw stream sample root for saving/reading samples | `tests/raw_stream_samples` |
+| `DS2API_DEEPSEEK_CLIENT_VERSION` | Override the DeepSeek Android client version header | Built-in version |
+| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | Override Android API level used to derive `User-Agent` | `35` |
+| `DS2API_DEEPSEEK_CLIENT_LOCALE` | Override DeepSeek client locale and derived `Accept-Language` | `zh_CN` |
+| `DS2API_DEEPSEEK_CLIENT_PLATFORM` | Override client platform marker | `android` |
+| `DS2API_DEEPSEEK_CLIENT_NAME` | Override client name used to derive `User-Agent` | `DeepSeek` |
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |

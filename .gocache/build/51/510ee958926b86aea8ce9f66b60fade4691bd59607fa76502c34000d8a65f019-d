@@ -1,5 +1,0 @@
-./deps.go
-./handler_config_import.go
-./handler_config_read.go
-./handler_config_write.go
-./routes.go

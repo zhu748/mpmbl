@@ -65,8 +65,8 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 		t.Fatalf("expected current_input_file.min_chars=0, got %d body=%v", got, body)
 	}
 	thinkingInjection, _ := body["thinking_injection"].(map[string]any)
-	if got := boolFrom(thinkingInjection["enabled"]); !got {
-		t.Fatalf("expected thinking_injection.enabled=true, body=%v", body)
+	if got := boolFrom(thinkingInjection["enabled"]); got {
+		t.Fatalf("expected thinking_injection.enabled=false, body=%v", body)
 	}
 	if got, _ := thinkingInjection["prompt"].(string); got != "" {
 		t.Fatalf("expected empty custom thinking prompt, got %q body=%v", got, body)

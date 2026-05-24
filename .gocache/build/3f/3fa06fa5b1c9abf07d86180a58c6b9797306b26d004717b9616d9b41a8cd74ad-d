@@ -1,4 +1,0 @@
-./render_chat.go
-./render_responses.go
-./render_stream_events.go
-./render_usage.go

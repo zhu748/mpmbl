@@ -267,6 +267,11 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `DS2API_VERCEL_INTERNAL_SECRET` | 混合流式内部鉴权 | 回退用 `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease TTL | `900` |
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | raw stream 样本保存/读取根目录 | `tests/raw_stream_samples` |
+| `DS2API_DEEPSEEK_CLIENT_VERSION` | 覆盖 DeepSeek Android 客户端版本请求头 | 内置版本 |
+| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | 覆盖 Android API level，用于派生 `User-Agent` | `35` |
+| `DS2API_DEEPSEEK_CLIENT_LOCALE` | 覆盖 DeepSeek 客户端 locale，并派生 `Accept-Language` | `zh_CN` |
+| `DS2API_DEEPSEEK_CLIENT_PLATFORM` | 覆盖客户端平台标识 | `android` |
+| `DS2API_DEEPSEEK_CLIENT_NAME` | 覆盖客户端名称，用于派生 `User-Agent` | `DeepSeek` |
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |

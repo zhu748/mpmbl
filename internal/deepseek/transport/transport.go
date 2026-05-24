@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"crypto/tls"
+	"ds2api/internal/config"
 	"fmt"
 	"net"
 	"net/http"
@@ -109,11 +110,13 @@ func fingerprintTLSDialer(dialContext DialContextFunc, profiles []fingerprintPro
 				errs = append(errs, fmt.Errorf("%s handshake: %w", profile.name, err))
 				continue
 			}
-			if negotiated := uConn.ConnectionState().NegotiatedProtocol; !allowedNegotiatedALPN(negotiated, profile.alpnProtocols) {
+			negotiated := uConn.ConnectionState().NegotiatedProtocol
+			if !allowedNegotiatedALPN(negotiated, profile.alpnProtocols) {
 				_ = uConn.Close()
 				errs = append(errs, fmt.Errorf("%s negotiated unexpected ALPN protocol: %s", profile.name, negotiated))
 				continue
 			}
+			config.Logger.Debug("[deepseek_fingerprint] tls profile selected", "host", host, "profile", profile.name, "alpn", negotiated)
 			return uConn, nil
 		}
 		return nil, joinDialErrors(addr, errs)
@@ -161,5 +164,5 @@ func joinDialErrors(addr string, errs []error) error {
 		}
 		msg += "; " + err.Error()
 	}
-	return fmt.Errorf(msg)
+	return fmt.Errorf("%s", msg)
 }

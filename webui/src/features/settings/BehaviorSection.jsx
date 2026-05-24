@@ -31,7 +31,7 @@ export default function BehaviorSection({ t, form, setForm }) {
                 <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-4">
                     <input
                         type="checkbox"
-                        checked={Boolean(form.thinking_injection?.enabled ?? true)}
+                        checked={Boolean(form.thinking_injection?.enabled ?? false)}
                         onChange={(e) => setForm((prev) => ({
                             ...prev,
                             thinking_injection: {

@@ -16,7 +16,7 @@ export default function EditAccountModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="bg-card w-full max-w-md max-h-[90vh] rounded-xl border border-border shadow-2xl overflow-y-auto animate-in zoom-in-95">
                 <div className="p-4 border-b border-border flex justify-between items-start gap-4">
                     <div className="min-w-0">
                         <h3 className="font-semibold">{t('accountManager.modalEditAccountTitle')}</h3>
@@ -51,6 +51,17 @@ export default function EditAccountModal({
                             value={editAccount.remark}
                             onChange={e => setEditAccount({ ...editAccount, remark: e.target.value })}
                         />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1.5">{t('accountManager.deviceIdOptional')}</label>
+                        <input
+                            type="text"
+                            className="input-field"
+                            placeholder={t('accountManager.deviceIdPlaceholder')}
+                            value={editAccount.device_id}
+                            onChange={e => setEditAccount({ ...editAccount, device_id: e.target.value })}
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">{t('accountManager.deviceIdHint')}</p>
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
                         <button onClick={onClose} className="px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors text-sm font-medium">{t('actions.cancel')}</button>

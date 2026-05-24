@@ -56,13 +56,13 @@ func TestListAccountsPageSizeAbove5000ClampedTo5000(t *testing.T) {
 
 func TestUpdateAccountMetadataPreservesCredentials(t *testing.T) {
 	h := newAdminTestHandler(t, `{
-		"accounts":[{"email":"u@example.com","name":"old name","remark":"old remark","password":"secret"}]
+		"accounts":[{"email":"u@example.com","name":"old name","remark":"old remark","password":"secret","device_id":"old-device"}]
 	}`)
 
 	r := chi.NewRouter()
 	r.Put("/admin/accounts/{identifier}", h.updateAccount)
 
-	body := []byte(`{"name":"new name","remark":"new remark"}`)
+	body := []byte(`{"name":"new name","remark":"new remark","device_id":"new-device"}`)
 	req := httptest.NewRequest(http.MethodPut, "/admin/accounts/u@example.com", strings.NewReader(string(body)))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -81,6 +81,9 @@ func TestUpdateAccountMetadataPreservesCredentials(t *testing.T) {
 	}
 	if acc.Name != "new name" || acc.Remark != "new remark" {
 		t.Fatalf("metadata update did not persist: %#v", acc)
+	}
+	if acc.DeviceID != "new-device" {
+		t.Fatalf("device_id update did not persist: %#v", acc)
 	}
 	if acc.Password != "secret" {
 		t.Fatalf("password should be preserved, got %#v", acc)
@@ -114,5 +117,8 @@ func TestListAccountsMasksTokenPreview(t *testing.T) {
 	first, _ := items[0].(map[string]any)
 	if got, _ := first["token_preview"].(string); got != "ab****gh" {
 		t.Fatalf("expected masked token preview, got %q", got)
+	}
+	if _, ok := first["device_id"]; !ok {
+		t.Fatalf("expected device_id field in account list, got %#v", first)
 	}
 }

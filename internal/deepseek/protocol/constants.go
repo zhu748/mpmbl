@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 )
 
 const (
@@ -77,6 +79,7 @@ func init() {
 
 func applySharedConstants(cfg sharedConstants) {
 	client := normalizeClientConstants(cfg.Client)
+	client = applyEnvClientOverrides(client)
 	ClientVersion = client.Version
 	BaseHeaders = buildBaseHeaders(client, cfg.BaseHeaders)
 	SkipContainsPatterns = cloneStringSlice(defaultSkipContainsPatterns)
@@ -105,6 +108,25 @@ func normalizeClientConstants(in clientConstants) clientConstants {
 	return in
 }
 
+func applyEnvClientOverrides(in clientConstants) clientConstants {
+	if v := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_CLIENT_NAME")); v != "" {
+		in.Name = v
+	}
+	if v := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_CLIENT_PLATFORM")); v != "" {
+		in.Platform = v
+	}
+	if v := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_CLIENT_VERSION")); v != "" {
+		in.Version = v
+	}
+	if v := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_ANDROID_API_LEVEL")); v != "" {
+		in.AndroidAPILevel = v
+	}
+	if v := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_CLIENT_LOCALE")); v != "" {
+		in.Locale = v
+	}
+	return in
+}
+
 func buildBaseHeaders(client clientConstants, overrides map[string]string) map[string]string {
 	out := cloneStringMap(defaultStaticBaseHeaders)
 	for k, v := range overrides {
@@ -128,8 +150,28 @@ func buildBaseHeaders(client clientConstants, overrides map[string]string) map[s
 	}
 	if client.Locale != "" {
 		out["x-client-locale"] = client.Locale
+		if _, ok := out["Accept-Language"]; !ok {
+			out["Accept-Language"] = acceptLanguageFromLocale(client.Locale)
+		}
 	}
 	return out
+}
+
+func acceptLanguageFromLocale(locale string) string {
+	locale = strings.TrimSpace(locale)
+	if locale == "" {
+		return ""
+	}
+	tag := strings.ReplaceAll(locale, "_", "-")
+	base := tag
+	if idx := strings.Index(base, "-"); idx >= 0 {
+		base = base[:idx]
+	}
+	base = strings.TrimSpace(base)
+	if base == "" || base == tag {
+		return tag
+	}
+	return tag + "," + base + ";q=0.9"
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

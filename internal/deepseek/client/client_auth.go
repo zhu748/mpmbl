@@ -2,7 +2,9 @@ package client
 
 import (
 	"context"
+	"crypto/sha256"
 	dsprotocol "ds2api/internal/deepseek/protocol"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,7 +19,7 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	clients := c.requestClientsForAccount(acc)
 	payload := map[string]any{
 		"password":  strings.TrimSpace(acc.Password),
-		"device_id": "deepseek_to_api",
+		"device_id": loginDeviceID(acc),
 		"os":        "android",
 	}
 	if email := strings.TrimSpace(acc.Email); email != "" {
@@ -156,6 +158,24 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 		return "", &RequestFailure{Op: "get pow", Kind: lastFailureKind, Message: lastFailureMessage}
 	}
 	return "", errors.New("get pow failed")
+}
+
+func loginDeviceID(acc config.Account) string {
+	if deviceID := strings.TrimSpace(acc.DeviceID); deviceID != "" {
+		return deviceID
+	}
+	identifier := strings.ToLower(strings.TrimSpace(acc.Identifier()))
+	if identifier == "" {
+		identifier = strings.ToLower(strings.TrimSpace(acc.Email))
+	}
+	if identifier == "" {
+		identifier = strings.ToLower(strings.TrimSpace(acc.Mobile))
+	}
+	if identifier == "" {
+		return "deepseek_to_api"
+	}
+	sum := sha256.Sum256([]byte("ds2api:deepseek:android:" + identifier))
+	return hex.EncodeToString(sum[:8])
 }
 
 func (c *Client) authHeaders(token string) map[string]string {
