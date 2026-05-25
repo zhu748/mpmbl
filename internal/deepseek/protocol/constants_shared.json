@@ -3,14 +3,16 @@
     "name": "DeepSeek",
     "platform": "android",
     "version": "2.1.1",
-    "android_api_level": "35",
-    "locale": "zh_CN"
+    "android_api_level": "36",
+    "locale": "zh_CN",
+    "timezone_offset": "28800"
   },
   "base_headers": {
     "Host": "chat.deepseek.com",
     "Accept": "application/json",
     "Content-Type": "application/json",
-    "accept-charset": "UTF-8"
+    "accept-charset": "UTF-8",
+    "x-client-bundle-id": "com.deepseek.chat"
   },
   "skip_contains_patterns": [
     "quasi_status",

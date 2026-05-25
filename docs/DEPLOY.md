@@ -268,14 +268,19 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease TTL | `900` |
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | raw stream 样本保存/读取根目录 | `tests/raw_stream_samples` |
 | `DS2API_DEEPSEEK_CLIENT_VERSION` | 覆盖 DeepSeek Android 客户端版本请求头 | 内置版本 |
-| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | 覆盖 Android API level，用于派生 `User-Agent` | `35` |
+| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | 覆盖 Android API level，用于派生 `User-Agent` | `36` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | 覆盖 DeepSeek 客户端 locale，并派生 `Accept-Language` | `zh_CN` |
 | `DS2API_DEEPSEEK_CLIENT_PLATFORM` | 覆盖客户端平台标识 | `android` |
 | `DS2API_DEEPSEEK_CLIENT_NAME` | 覆盖客户端名称，用于派生 `User-Agent` | `DeepSeek` |
+| `DS2API_DEEPSEEK_CLIENT_TIMEZONE_OFFSET` | 覆盖 `x-client-timezone-offset`，单位秒 | `28800` |
+| `DS2API_DEEPSEEK_RANGERS_ID` | 强制覆盖所有请求的 `x-rangers-id` 设备埋点标识 | — |
+| `DS2API_DEEPSEEK_RANGERS_SEED` | 自定义兜底 `x-rangers-id` 派生种子；未强制覆盖且没有账号上下文时生效 | — |
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | 部署保护绕过密钥（内部 Node→Go 调用） | — |
+
+未设置 `DS2API_DEEPSEEK_RANGERS_ID` 时，账号请求会按账号标识自动派生稳定 19 位 `x-rangers-id`；同一账号保持一致，不同账号尽量不同。
 
 ### 3.3 运行时行为配置（通过 Admin API 设置）
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"ds2api/internal/auth"
 	"ds2api/internal/config"
 )
 
@@ -39,6 +40,52 @@ func TestExtractCreateSessionIDSupportsNestedChatSessionShape(t *testing.T) {
 
 	if got := extractCreateSessionID(resp); got != "nested-session-id" {
 		t.Fatalf("expected nested session id, got %q", got)
+	}
+}
+
+func TestCreateSessionUsesEmptyBody(t *testing.T) {
+	var body []byte
+	var contentType string
+	var rangersID string
+	client := &Client{
+		regular: doerFunc(func(req *http.Request) (*http.Response, error) {
+			var err error
+			body, err = io.ReadAll(req.Body)
+			if err != nil {
+				t.Fatalf("read request body: %v", err)
+			}
+			contentType = req.Header.Get("Content-Type")
+			rangersID = req.Header.Get("x-rangers-id")
+			resp := `{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"chat_session":{"id":"session-123"}}}}`
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(resp)),
+				Request:    req,
+			}, nil
+		}),
+		fallback: &http.Client{},
+	}
+
+	sessionID, err := client.CreateSession(context.Background(), &auth.RequestAuth{
+		DeepSeekToken: "token-123",
+		AccountID:     "account-1",
+		Account:       config.Account{Email: "user@example.com"},
+	}, 1)
+	if err != nil {
+		t.Fatalf("CreateSession failed: %v", err)
+	}
+	if sessionID != "session-123" {
+		t.Fatalf("sessionID=%q want session-123", sessionID)
+	}
+	if len(body) != 0 {
+		t.Fatalf("body=%q want empty", string(body))
+	}
+	if contentType != "application/json" {
+		t.Fatalf("Content-Type=%q want application/json", contentType)
+	}
+	if rangersID == "" {
+		t.Fatal("expected x-rangers-id")
 	}
 }
 

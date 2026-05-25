@@ -31,7 +31,7 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	} else {
 		return "", errors.New("missing email/mobile")
 	}
-	resp, err := c.postJSON(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, dsprotocol.BaseHeaders, payload)
+	resp, err := c.postJSON(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, accountBaseHeaders(acc), payload)
 	if err != nil {
 		return "", err
 	}
@@ -60,8 +60,8 @@ func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAtte
 	attempts := 0
 	refreshed := false
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
-		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreateSessionURL, headers, map[string]any{"agent": "chat"})
+		headers := c.authHeadersForAuth(a)
+		resp, status, err := c.postEmptyJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreateSessionURL, headers)
 		if err != nil {
 			config.Logger.Warn("[create_session] request error", "error", err, "account", a.AccountID)
 			attempts++
@@ -111,7 +111,7 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 	lastFailureKind := FailureUnknown
 	lastFailureMessage := ""
 	for attempts < maxAttempts {
-		headers := c.authHeaders(a.DeepSeekToken)
+		headers := c.authHeadersForAuth(a)
 		resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekCreatePowURL, headers, map[string]any{"target_path": targetPath})
 		if err != nil {
 			config.Logger.Warn("[get_pow] request error", "error", err, "account", a.AccountID, "target_path", targetPath)
@@ -185,6 +185,45 @@ func (c *Client) authHeaders(token string) map[string]string {
 	}
 	headers["authorization"] = "Bearer " + token
 	return headers
+}
+
+func (c *Client) authHeadersForAuth(a *auth.RequestAuth) map[string]string {
+	if a == nil {
+		return c.authHeaders("")
+	}
+	headers := dsprotocol.BaseHeadersForRangersSeed(accountHeaderSeed(a))
+	headers["authorization"] = "Bearer " + a.DeepSeekToken
+	return headers
+}
+
+func accountBaseHeaders(acc config.Account) map[string]string {
+	return dsprotocol.BaseHeadersForRangersSeed(accountIdentifierSeed(acc))
+}
+
+func accountHeaderSeed(a *auth.RequestAuth) string {
+	if a == nil {
+		return ""
+	}
+	if seed := accountIdentifierSeed(a.Account); seed != "" {
+		return seed
+	}
+	return strings.TrimSpace(a.AccountID)
+}
+
+func accountIdentifierSeed(acc config.Account) string {
+	if id := strings.TrimSpace(acc.Identifier()); id != "" {
+		return strings.ToLower(id)
+	}
+	if email := strings.TrimSpace(acc.Email); email != "" {
+		return strings.ToLower(email)
+	}
+	if mobile := strings.TrimSpace(acc.Mobile); mobile != "" {
+		return strings.ToLower(mobile)
+	}
+	if deviceID := strings.TrimSpace(acc.DeviceID); deviceID != "" {
+		return strings.ToLower(deviceID)
+	}
+	return ""
 }
 
 func isTokenInvalid(status int, code int, bizCode int, msg string, bizMsg string) bool {

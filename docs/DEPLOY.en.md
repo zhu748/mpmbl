@@ -268,14 +268,19 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL | `900` |
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | Raw stream sample root for saving/reading samples | `tests/raw_stream_samples` |
 | `DS2API_DEEPSEEK_CLIENT_VERSION` | Override the DeepSeek Android client version header | Built-in version |
-| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | Override Android API level used to derive `User-Agent` | `35` |
+| `DS2API_DEEPSEEK_ANDROID_API_LEVEL` | Override Android API level used to derive `User-Agent` | `36` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | Override DeepSeek client locale and derived `Accept-Language` | `zh_CN` |
 | `DS2API_DEEPSEEK_CLIENT_PLATFORM` | Override client platform marker | `android` |
 | `DS2API_DEEPSEEK_CLIENT_NAME` | Override client name used to derive `User-Agent` | `DeepSeek` |
+| `DS2API_DEEPSEEK_CLIENT_TIMEZONE_OFFSET` | Override `x-client-timezone-offset`, in seconds | `28800` |
+| `DS2API_DEEPSEEK_RANGERS_ID` | Force one `x-rangers-id` device telemetry marker for all requests | — |
+| `DS2API_DEEPSEEK_RANGERS_SEED` | Custom fallback seed for deriving `x-rangers-id`; used only when no forced ID and no account context are available | — |
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | Deployment protection bypass for internal Node→Go calls | — |
+
+When `DS2API_DEEPSEEK_RANGERS_ID` is unset, account-backed requests derive a stable 19-digit `x-rangers-id` from the account identity; the same account stays consistent while different accounts tend to differ.
 
 ### 3.4 Vercel Architecture
 
