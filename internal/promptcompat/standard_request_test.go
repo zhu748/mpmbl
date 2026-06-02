@@ -46,6 +46,15 @@ func TestStandardRequestCompletionPayloadSetsModelTypeFromResolvedModel(t *testi
 			if got := payload["temperature"]; got != 0.3 {
 				t.Fatalf("expected passthrough temperature, got %#v", got)
 			}
+			if got, ok := payload["audio_id"]; !ok || got != nil {
+				t.Fatalf("expected app-compatible audio_id=nil, got %#v", got)
+			}
+			if got := payload["preempt"]; got != false {
+				t.Fatalf("expected app-compatible preempt=false, got %#v", got)
+			}
+			if got, ok := payload["action"]; !ok || got != nil {
+				t.Fatalf("expected app-compatible action=nil, got %#v", got)
+			}
 			refFileIDs, ok := payload["ref_file_ids"].([]any)
 			if !ok {
 				t.Fatalf("expected ref_file_ids slice, got %#v", payload["ref_file_ids"])
@@ -54,5 +63,29 @@ func TestStandardRequestCompletionPayloadSetsModelTypeFromResolvedModel(t *testi
 				t.Fatalf("unexpected ref_file_ids: %#v", refFileIDs)
 			}
 		})
+	}
+}
+
+func TestStandardRequestCompletionPayloadAllowsAppFieldPassthroughOverrides(t *testing.T) {
+	req := StandardRequest{
+		ResolvedModel: "deepseek-v4-pro",
+		FinalPrompt:   "hello",
+		PassThrough: map[string]any{
+			"audio_id": "audio-123",
+			"preempt":  true,
+			"action":   "regenerate",
+		},
+	}
+
+	payload := req.CompletionPayload("session-123")
+
+	if got := payload["audio_id"]; got != "audio-123" {
+		t.Fatalf("audio_id passthrough=%#v want audio-123", got)
+	}
+	if got := payload["preempt"]; got != true {
+		t.Fatalf("preempt passthrough=%#v want true", got)
+	}
+	if got := payload["action"]; got != "regenerate" {
+		t.Fatalf("action passthrough=%#v want regenerate", got)
 	}
 }

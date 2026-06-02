@@ -35,6 +35,10 @@ type streamLease struct {
 	ExpiresAt time.Time
 }
 
+type stopStreamCaller interface {
+	StopStream(ctx context.Context, a *auth.RequestAuth, sessionID string, messageID int, maxAttempts int) error
+}
+
 func (h *Handler) compatStripReferenceMarkers() bool {
 	if h == nil {
 		return true

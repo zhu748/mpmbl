@@ -140,6 +140,9 @@ func collectOpenAIChatPassThrough(req map[string]any) map[string]any {
 		"presence_penalty",
 		"frequency_penalty",
 		"stop",
+		"audio_id",
+		"preempt",
+		"action",
 	} {
 		if v, ok := req[k]; ok {
 			out[k] = v

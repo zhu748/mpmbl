@@ -209,7 +209,7 @@ func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, 
 		attempts := 0
 		currentResp := resp
 		for {
-			terminalWritten, retryable := h.consumeChatStreamAttempt(r, currentResp, streamRuntime, initialType, thinkingEnabled, historySession, attempts < emptyOutputRetryMaxAttempts())
+			terminalWritten, retryable := h.consumeChatStreamAttempt(r, a, currentResp, streamRuntime, initialType, thinkingEnabled, historySession, attempts < emptyOutputRetryMaxAttempts())
 			if terminalWritten {
 				// Error or success already written to stream
 				if strings.Contains(strings.ToLower(streamRuntime.finalErrorMessage), "limit") {
@@ -229,7 +229,7 @@ func (h *Handler) handleStreamWithRetry(w http.ResponseWriter, r *http.Request, 
 					config.Logger.Info("[openai_account_switch] switched account, restarting stream", "surface", "chat.completions", "new_account", a.AccountID)
 					if h.restartStreamCompletion(r.Context(), a, payload, streamRuntime, &currentResp) {
 						completionID = "" // Will be set by restartStreamCompletion via streamRuntime update
-						break // Continue outer loop with new account
+						break             // Continue outer loop with new account
 					}
 				}
 				// Can't switch — write error to stream
@@ -345,7 +345,7 @@ func (h *Handler) prepareChatStreamRuntime(w http.ResponseWriter, resp *http.Res
 	return streamRuntime, initialType, true
 }
 
-func (h *Handler) consumeChatStreamAttempt(r *http.Request, resp *http.Response, streamRuntime *chatStreamRuntime, initialType string, thinkingEnabled bool, historySession *chatHistorySession, allowDeferEmpty bool) (bool, bool) {
+func (h *Handler) consumeChatStreamAttempt(r *http.Request, a *auth.RequestAuth, resp *http.Response, streamRuntime *chatStreamRuntime, initialType string, thinkingEnabled bool, historySession *chatHistorySession, allowDeferEmpty bool) (bool, bool) {
 	defer func() { _ = resp.Body.Close() }()
 	finalReason := "stop"
 	contextCancelled := false
@@ -379,6 +379,7 @@ func (h *Handler) consumeChatStreamAttempt(r *http.Request, resp *http.Response,
 		},
 	})
 	if contextCancelled {
+		h.stopUpstreamStream(context.WithoutCancel(r.Context()), streamRuntime, a)
 		streamRuntime.sendFailedChunk(http.StatusRequestTimeout, "Request context cancelled before stream completed.", string(streamengine.StopReasonContextCancelled))
 		return true, false
 	}
@@ -418,4 +419,22 @@ func logChatStreamTerminal(streamRuntime *chatStreamRuntime, attempts int) {
 		return
 	}
 	config.Logger.Info("[openai_empty_retry] completed", "surface", "chat.completions", "stream", true, "retry_attempts", attempts, "success_source", source)
+}
+
+func (h *Handler) stopUpstreamStream(ctx context.Context, streamRuntime *chatStreamRuntime, a *auth.RequestAuth) {
+	if h == nil || streamRuntime == nil || a == nil {
+		return
+	}
+	stopper, ok := h.DS.(stopStreamCaller)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(streamRuntime.completionID) == "" || streamRuntime.responseMessageID <= 0 {
+		return
+	}
+	stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := stopper.StopStream(stopCtx, a, streamRuntime.completionID, streamRuntime.responseMessageID, 1); err != nil {
+		config.Logger.Warn("[stop_stream] best-effort upstream stop failed", "session_id", streamRuntime.completionID, "message_id", streamRuntime.responseMessageID, "error", err)
+	}
 }

@@ -80,6 +80,9 @@ func (r StandardRequest) CompletionPayload(sessionID string) map[string]any {
 		"ref_file_ids":      refFileIDs,
 		"thinking_enabled":  r.Thinking,
 		"search_enabled":    r.Search,
+		"audio_id":          nil,
+		"preempt":           false,
+		"action":            nil,
 	}
 	for k, v := range r.PassThrough {
 		payload[k] = v
