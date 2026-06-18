@@ -114,6 +114,33 @@ func ModelSuffixOptionsFor(model string) ModelSuffixOptions {
 	return opts
 }
 
+// AppendRequestControlSuffixes re-attaches the request-level control suffixes
+// (-historysplit / -thinking-injection) that ResolveModel strips while
+// normalizing a model name. The -nothinking suffix already preserved on the
+// resolved model is kept intact. This lets a downstream handler re-parse the
+// combined name to force history split / thinking injection when the original
+// request carried those suffixes.
+func AppendRequestControlSuffixes(model string, opts ModelSuffixOptions) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return model
+	}
+	base, existing := splitModelSuffixes(model)
+	out := base
+	if existing.NoThinking {
+		out += noThinkingModelSuffix
+	}
+	switch {
+	case opts.HistorySplit && opts.ThinkingInjection:
+		out += historySplitThinkingInjectionSuffix
+	case opts.ThinkingInjection:
+		out += thinkingInjectionModelSuffix
+	case opts.HistorySplit:
+		out += historySplitModelSuffix
+	}
+	return out
+}
+
 func DefaultModelAliases() map[string]string {
 	return map[string]string{
 		// OpenAI GPT / ChatGPT families

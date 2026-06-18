@@ -166,7 +166,7 @@ func TestClaudeProxyViaOpenAIEnablesThinkingWhenRequested(t *testing.T) {
 	}
 }
 
-func TestClaudeProxyViaOpenAIKeepsStreamDefaultThinkingDisabled(t *testing.T) {
+func TestClaudeProxyViaOpenAIEnablesStreamDefaultThinkingForThinkingModel(t *testing.T) {
 	openAI := &openAIProxyCaptureStub{}
 	h := &Handler{
 		Store:  claudeProxyStoreStub{aliases: map[string]string{"claude-sonnet-4-6": "deepseek-v4-flash"}},
@@ -178,8 +178,61 @@ func TestClaudeProxyViaOpenAIKeepsStreamDefaultThinkingDisabled(t *testing.T) {
 	h.Messages(rec, req)
 
 	thinking, _ := openAI.seenReq["thinking"].(map[string]any)
+	if thinking["type"] != "enabled" {
+		t.Fatalf("expected Claude stream default to follow model default thinking (enabled) for thinking models, got %#v", openAI.seenReq)
+	}
+}
+
+func TestClaudeProxyViaOpenAIDisablesStreamThinkingForNoThinkingModel(t *testing.T) {
+	openAI := &openAIProxyCaptureStub{}
+	h := &Handler{
+		Store:  claudeProxyStoreStub{aliases: map[string]string{"claude-sonnet-4-6": "deepseek-v4-flash"}},
+		OpenAI: openAI,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", strings.NewReader(`{"model":"claude-sonnet-4-6-nothinking","messages":[{"role":"user","content":"hi"}],"stream":true}`))
+	rec := httptest.NewRecorder()
+
+	h.Messages(rec, req)
+
+	thinking, _ := openAI.seenReq["thinking"].(map[string]any)
 	if thinking["type"] != "disabled" {
-		t.Fatalf("expected Claude stream default to keep downstream thinking disabled, got %#v", openAI.seenReq)
+		t.Fatalf("expected nothinking model to keep downstream thinking disabled on stream, got %#v", openAI.seenReq)
+	}
+}
+
+func TestClaudeProxyViaOpenAIPreservesHistorySplitSuffix(t *testing.T) {
+	openAI := &openAIProxyCaptureStub{}
+	h := &Handler{
+		Store:  claudeProxyStoreStub{aliases: map[string]string{"claude-sonnet-4-6": "deepseek-v4-flash"}},
+		OpenAI: openAI,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", strings.NewReader(`{"model":"claude-sonnet-4-6-historysplit","messages":[{"role":"user","content":"hi"}],"stream":false}`))
+	rec := httptest.NewRecorder()
+
+	h.Messages(rec, req)
+
+	if got := strings.TrimSpace(openAI.seenModel); got != "deepseek-v4-flash-historysplit" {
+		t.Fatalf("expected proxied model to preserve -historysplit suffix, got %q", got)
+	}
+}
+
+func TestClaudeProxyViaOpenAIPreservesThinkingInjectionSuffix(t *testing.T) {
+	openAI := &openAIProxyCaptureStub{}
+	h := &Handler{
+		Store:  claudeProxyStoreStub{aliases: map[string]string{"claude-sonnet-4-6": "deepseek-v4-flash"}},
+		OpenAI: openAI,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/v1/messages", strings.NewReader(`{"model":"claude-sonnet-4-6-thinking-injection","messages":[{"role":"user","content":"hi"}],"stream":true}`))
+	rec := httptest.NewRecorder()
+
+	h.Messages(rec, req)
+
+	if got := strings.TrimSpace(openAI.seenModel); got != "deepseek-v4-flash-thinking-injection" {
+		t.Fatalf("expected proxied model to preserve -thinking-injection suffix, got %q", got)
+	}
+	thinking, _ := openAI.seenReq["thinking"].(map[string]any)
+	if thinking["type"] != "enabled" {
+		t.Fatalf("expected thinking-injection suffix to keep downstream thinking enabled on stream, got %#v", openAI.seenReq)
 	}
 }
 

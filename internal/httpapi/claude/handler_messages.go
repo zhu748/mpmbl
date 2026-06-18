@@ -49,10 +49,19 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 	if store != nil {
 		if norm, normErr := normalizeClaudeRequest(store, cloneMap(req)); normErr == nil && strings.TrimSpace(norm.Standard.ResolvedModel) != "" {
 			translateModel = strings.TrimSpace(norm.Standard.ResolvedModel)
+			// ResolveModel strips the request-level control suffixes
+			// (-historysplit / -thinking-injection). Re-attach them so the
+			// downstream OpenAI handler can still force history split /
+			// thinking injection when the Claude request name carries them.
+			translateModel = config.AppendRequestControlSuffixes(translateModel, config.ModelSuffixOptionsFor(model))
 		}
 	}
 	translatedReq := translatorcliproxy.ToOpenAI(sdktranslator.FormatClaude, translateModel, raw, stream)
-	translatedReq, exposeThinking := applyClaudeThinkingPolicyToOpenAIRequest(translatedReq, req, stream)
+	// Default thinking follows the resolved model's own default instead of
+	// being tied to stream/non-stream, so models that default to thinking
+	// (e.g. deepseek-v4-flash) still reason on streaming Claude requests.
+	defaultThinking, _, _ := config.GetModelConfig(translateModel)
+	translatedReq, exposeThinking := applyClaudeThinkingPolicyToOpenAIRequest(translatedReq, req, defaultThinking)
 
 	isVercelPrepare := strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1"
 	isVercelRelease := strings.TrimSpace(r.URL.Query().Get("__stream_release")) == "1"
@@ -127,7 +136,7 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 	return true
 }
 
-func applyClaudeThinkingPolicyToOpenAIRequest(translated []byte, original map[string]any, stream bool) ([]byte, bool) {
+func applyClaudeThinkingPolicyToOpenAIRequest(translated []byte, original map[string]any, defaultThinking bool) ([]byte, bool) {
 	req := map[string]any{}
 	if err := json.Unmarshal(translated, &req); err != nil {
 		return translated, false
@@ -137,7 +146,9 @@ func applyClaudeThinkingPolicyToOpenAIRequest(translated []byte, original map[st
 		if _, translatedHasOverride := util.ResolveThinkingOverride(req); translatedHasOverride {
 			return translated, false
 		}
-		enabled = !stream
+		// No explicit override: follow the resolved model's default thinking
+		// flag instead of forcing it off for streaming requests.
+		enabled = defaultThinking
 	}
 	typ := "disabled"
 	if enabled {
