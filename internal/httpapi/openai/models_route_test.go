@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,6 +29,22 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 		r.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("direct_historysplit", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v1/models/deepseek-v4-flash-historysplit", nil)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+		}
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if body["id"] != "deepseek-v4-flash-historysplit" {
+			t.Fatalf("expected direct suffix id to round-trip, got %#v", body["id"])
 		}
 	})
 

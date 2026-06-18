@@ -48,6 +48,33 @@ func TestResolveLatestClaudeAliasNoThinking(t *testing.T) {
 	}
 }
 
+func TestResolveModelControlSuffixes(t *testing.T) {
+	cases := []struct {
+		name             string
+		model            string
+		want             string
+		wantHistorySplit bool
+		wantThinkingInj  bool
+	}{
+		{name: "direct history split", model: "deepseek-v4-flash-historysplit", want: "deepseek-v4-flash", wantHistorySplit: true},
+		{name: "alias thinking injection", model: "gpt-4.1-thinking-injection", want: "deepseek-v4-flash", wantThinkingInj: true},
+		{name: "alias both", model: "claude-sonnet-4-6-historysplit-thinking-injection", want: "deepseek-v4-flash", wantHistorySplit: true, wantThinkingInj: true},
+		{name: "combined with nothinking", model: "o3-super-nothinking-historysplit", want: "deepseek-v4-pro-nothinking", wantHistorySplit: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := ResolveModel(nil, tc.model)
+			if !ok || got != tc.want {
+				t.Fatalf("expected %s -> %s, got ok=%v model=%q", tc.model, tc.want, ok, got)
+			}
+			opts := ModelSuffixOptionsFor(tc.model)
+			if opts.HistorySplit != tc.wantHistorySplit || opts.ThinkingInjection != tc.wantThinkingInj {
+				t.Fatalf("unexpected suffix options for %q: %#v", tc.model, opts)
+			}
+		})
+	}
+}
+
 func TestResolveExpandedHistoricalAliases(t *testing.T) {
 	cases := []struct {
 		name  string

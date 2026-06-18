@@ -161,7 +161,7 @@ flowchart LR
 | vision | `deepseek-v4-vision-search` | 默认开启，可由请求参数控制 | ✅ |
 | vision | `deepseek-v4-vision-search-nothinking` | 永久关闭，不受请求参数影响 | ✅ |
 
-除原生模型外，也支持常见 alias 输入（如 `gpt-4.1`、`gpt-5`、`gpt-5-codex`、`o3`、`claude-*`、`gemini-*` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。若 alias 名本身追加 `-nothinking` 后缀，也会映射到对应的强制关思考模型。完整 alias 行为以 [API.md](API.md#模型-alias-解析策略) 和 `config.example.json` 为准。
+除原生模型外，也支持常见 alias 输入（如 `gpt-4.1`、`gpt-5`、`gpt-5-codex`、`o3`、`claude-*`、`gemini-*` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID 及其内置语义后缀变体。若 alias 名本身追加 `-nothinking` 后缀，也会映射到对应的强制关思考模型。所有模型还支持 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 三个请求级控制后缀，分别强制启用默认历史拆分、思考模式提示注入、以及同时启用两者。完整 alias 行为以 [API.md](API.md#模型-alias-解析策略) 和 `config.example.json` 为准。
 
 ### Claude 接口（`GET /anthropic/v1/models`）
 
@@ -174,7 +174,7 @@ flowchart LR
 | `claude-opus-4-6` | `deepseek-v4-pro` |
 | `claude-opus-4-6-nothinking` | `deepseek-v4-pro-nothinking` |
 
-可通过配置中的 `model_aliases` 覆盖映射关系；若请求模型名带 `-nothinking`，会在最终映射结果上强制追加无思考语义。
+可通过配置中的 `model_aliases` 覆盖映射关系；若请求模型名带 `-nothinking`，会在最终映射结果上强制追加无思考语义；若带 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection`，会启用对应请求级控制。
 `/anthropic/v1/models` 除上述主别名外，还会返回 Claude 4.x snapshots、3.x 历史模型 ID 与常见 alias，便于旧客户端直接兼容。
 
 #### Claude Code 接入避坑（实测）

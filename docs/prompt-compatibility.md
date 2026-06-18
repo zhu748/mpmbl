@@ -105,7 +105,7 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 - 当前 `/v1/chat/completions` 业务路径仍是“每次请求新建一个远端 `chat_session_id`，并默认发送 `parent_message_id: null`”；因此 DS2API 对外默认表现为“新会话 + prompt 拼历史”，而不是复用 DeepSeek 原生会话树。
 - 但 DeepSeek 远端本身支持同一 `chat_session_id` 的跨轮次持续对话。2026-04-27 已用项目内现有 DeepSeek client 做过一次不改业务代码的双轮实测：同一 `chat_session_id` 下，第 1 轮返回 `request_message_id=1` / `response_message_id=2` / 文本 `SESSION_TEST_ONE`；第 2 轮重新获取一次 PoW，并发送 `parent_message_id=2` 后，成功返回 `request_message_id=3` / `response_message_id=4` / 文本 `SESSION_TEST_TWO`。这说明“同远端会话持续聊天”能力存在，且每轮需要携带正确的 parent/message 链接信息，同时重新获取对应轮次可用的 PoW。
 - OpenAI Chat / Responses 原生走统一 OpenAI 标准化与 DeepSeek payload 组装；Claude / Gemini 会尽量复用 OpenAI prompt/tool 语义，其中 Gemini 直接复用 `promptcompat.BuildOpenAIPromptForAdapter`，Claude 消息接口在可代理场景会转换为 OpenAI chat 形态再执行。
-- 客户端传入的 thinking / reasoning 开关会被归一到下游 `thinking_enabled`。Gemini `generationConfig.thinkingConfig.thinkingBudget` 会翻译成同一套 thinking 开关；关闭时即使上游返回 `response/thinking_content`，兼容层也不会把它当作可见正文输出。若最终解析出的模型名带 `-nothinking` 后缀，则会无条件强制关闭 thinking，优先级高于请求体中的 `thinking` / `reasoning` / `reasoning_effort`。Claude surface 在流式请求且未显式声明 `thinking` 时，仍按 Anthropic 语义默认关闭；但在非流式代理场景，兼容层会内部开启一次下游 thinking，用于捕获“正文为空、工具调用落在 thinking 里”的情况，随后在回包前剥离用户不可见的 thinking block。
+- 客户端传入的 thinking / reasoning 开关会被归一到下游 `thinking_enabled`。Gemini `generationConfig.thinkingConfig.thinkingBudget` 会翻译成同一套 thinking 开关；关闭时即使上游返回 `response/thinking_content`，兼容层也不会把它当作可见正文输出。若最终解析出的模型名带 `-nothinking` 后缀，则会无条件强制关闭 thinking，优先级高于请求体中的 `thinking` / `reasoning` / `reasoning_effort`。模型名还支持 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 三个请求级控制后缀，解析时会剥离后缀并分别强制启用默认历史拆分、思考模式提示注入、以及同时启用两者。Claude surface 在流式请求且未显式声明 `thinking` 时，仍按 Anthropic 语义默认关闭；但在非流式代理场景，兼容层会内部开启一次下游 thinking，用于捕获“正文为空、工具调用落在 thinking 里”的情况，随后在回包前剥离用户不可见的 thinking block。
 - 对 OpenAI Chat / Responses 的非流式收尾，如果最终可见正文为空，兼容层会优先尝试把思维链中的独立 DSML / XML 工具块当作真实工具调用解析出来。流式链路也会在收尾阶段做同样的 fallback 检测，但不会因为思维链内容去中途拦截或改写流式输出；thinking / reasoning 增量仍按原样先发，只有在结束收尾时才可能补发最终工具调用结果。补发结果会作为本轮 assistant 的结构化 `tool_calls` / `function_call` 输出返回，而不是塞进 `content` 文本；如果客户端没有开启 thinking / reasoning，思维链只用于检测，不会作为 `reasoning_content` 或可见正文暴露。只有正文为空且思维链里也没有可执行工具调用时，才继续按空回复错误处理。
 - OpenAI Chat / Responses 的空回复错误处理之前会默认做一次内部补偿重试：第一次上游完整结束后，如果最终可见正文为空、没有解析到工具调用、也没有已经向客户端流式发出工具调用，并且终止原因不是 `content_filter`，兼容层会复用同一个 `chat_session_id`、账号、token 与工具策略，把原始 completion `prompt` 追加固定后缀 `Previous reply had no visible output. Please regenerate the visible final answer or tool call now.` 后重新提交一次。重试遵循 DeepSeek 多轮对话协议：从第一次上游 SSE 流中提取 `response_message_id`，并在重试 payload 中设置 `parent_message_id` 为该值，使重试成为同一会话的后续轮次而非断裂的根消息；同时重新获取一次 PoW（若 PoW 获取失败则回退到原始 PoW）。该重试不会重新标准化消息、不会新建 session、不会切换账号，也不会向流式客户端插入重试标记；第二次 thinking / reasoning 会按正常增量直接接到第一次之后，并继续使用 overlap trim 去重。若第二次仍为空，终端错误码仍保持现有 `upstream_empty_output`；若任一尝试触发空 `content_filter`，不做补偿重试并保持 `content_filter` 错误。JS Vercel 运行时同样设置 `parent_message_id`，但因无法直接调用 PoW API 而复用原始 PoW。
 - OpenAI Chat 流式请求如果下游客户端在上游尚未完成时断开，且本轮已经从 DeepSeek SSE 中拿到 `response_message_id`，服务会 best-effort 调用 `/api/v0/chat/stop_stream`，payload 为当前 `chat_session_id` 与 `message_id`，用来贴近 App 点击“暂停”的行为；该调用失败只记录日志，不改变已经断开的客户端响应。
@@ -114,7 +114,7 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 
 ## 5. prompt 是怎么拼出来的
 
-OpenAI Chat / Responses 在标准化后、current input file 之前，可通过 `thinking_injection` 增强追加思考格式提示词。它参考 DeepSeek V4 “把控制指令放在 user 消息末尾更稳定”的用法，在最新 user message 后追加思考增强提示词。当前内置默认提示词以 `Reasoning Effort: Absolute maximum with no shortcuts permitted.` 开头，并继续要求模型充分分解问题、覆盖潜在路径与边界条件、把完整推演过程显式写出。该开关默认关闭，可通过 `thinking_injection.enabled=true` 开启；也可以通过 `thinking_injection.prompt` 自定义提示词，留空时使用内置默认提示词。
+OpenAI Chat / Responses 在标准化后、current input file 之前，可通过 `thinking_injection` 增强追加思考格式提示词。它参考 DeepSeek V4 “把控制指令放在 user 消息末尾更稳定”的用法，在最新 user message 后追加思考增强提示词。当前内置默认提示词以 `Reasoning Effort: Absolute maximum with no shortcuts permitted.` 开头，并继续要求模型充分分解问题、覆盖潜在路径与边界条件、把完整推演过程显式写出。该开关默认关闭，可通过 `thinking_injection.enabled=true` 开启；也可以通过 `thinking_injection.prompt` 自定义提示词，留空时使用内置默认提示词。请求模型名带 `-thinking-injection` 或 `-historysplit-thinking-injection` 时，即使全局配置未开启，也会对当前请求使用同一套注入逻辑。
 
 这段增强属于 prompt 可见上下文：
 
@@ -249,7 +249,7 @@ OpenAI 文件相关实现：
 
 ## 9. 多轮历史为什么不会一直完整内联在 prompt
 
-兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 已废弃，只保留为兼容旧配置的字段，不再参与请求处理。
+兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 已废弃，只保留为兼容旧配置的字段，不再参与请求处理。请求模型名带 `-historysplit` 或 `-historysplit-thinking-injection` 时，会对当前请求强制启用默认 current input file 拆分，不依赖全局 `current_input_file.enabled`。
 
 - `current_input_file` 默认开启；它用于把“完整上下文”合并进隐藏上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，兼容层会上传一个文件名为 `IGNORE.txt` 的上下文文件，并在 live prompt 中只保留一个中性的 user 消息要求模型直接回答最新请求，不再暴露文件名或要求模型读取本地文件。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。

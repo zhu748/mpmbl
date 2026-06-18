@@ -211,7 +211,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 }
 ```
 
-> 说明：`/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID；常见 alias 仅用于请求入参解析，不会在该接口中单独展开返回。带 `-nothinking` 后缀的模型表示无论请求里是否显式开启 thinking / reasoning，都会强制关闭思考输出。
+> 说明：`/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID 及其内置语义后缀变体；常见 alias 仅用于请求入参解析，不会在该接口中单独展开返回。带 `-nothinking` 后缀的模型表示无论请求里是否显式开启 thinking / reasoning，都会强制关闭思考输出。所有原生模型还会提供 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 三个请求级控制后缀，分别强制启用默认历史拆分、思考模式提示注入、以及同时启用两者。
 
 ### 模型 alias 解析策略
 
@@ -220,8 +220,9 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 1. 先匹配 DeepSeek 原生模型。
 2. 再匹配 `model_aliases` 精确映射。
 3. 如果请求名以 `-nothinking` 结尾，则在最终解析出的规范模型上追加对应的无思考变体。
-4. 未命中时按模型家族规则回退（如 `o*`、`gpt-*`、`claude-*`）。
-5. 仍未命中则返回 `invalid_request_error`。
+4. 如果请求名以 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 结尾，则剥离该后缀并对当前请求启用对应控制；这些后缀不改变最终 DeepSeek 模型类型。
+5. 未命中时按模型家族规则回退（如 `o*`、`gpt-*`、`claude-*`）。
+6. 仍未命中则返回 `invalid_request_error`。
 
 当前内置默认 alias 来自 `internal/config/models.go`，`config.model_aliases` 会在运行时覆盖或补充同名映射。节选：
 
@@ -231,7 +232,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 - Gemini：`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-pro-vision`
 - 其他兼容族：`llama-*`、`qwen-*`、`mistral-*`、`command-*` 会按家族启发式回退
 
-上述 alias 若在请求名后追加 `-nothinking` 后缀，也会映射到对应的强制关闭 thinking 版本。
+上述 alias 若在请求名后追加 `-nothinking` 后缀，也会映射到对应的强制关闭 thinking 版本；追加 `-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 时，会映射到基础模型并启用对应请求级控制。
 
 退役历史模型（如 `claude-1.*`、`claude-2.*`、`claude-instant-*`、`gpt-3.5*`）会被显式拒绝。
 
@@ -248,7 +249,7 @@ Content-Type: application/json
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | 支持 DeepSeek 原生模型 + 常见 alias（如 `gpt-5.5`、`gpt-5.4-mini`、`gpt-5.3-codex`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-6`、`gemini-2.5-pro`、`gemini-2.5-flash` 等）；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning |
+| `model` | string | ✅ | 支持 DeepSeek 原生模型 + 常见 alias（如 `gpt-5.5`、`gpt-5.4-mini`、`gpt-5.3-codex`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-6`、`gemini-2.5-pro`、`gemini-2.5-flash` 等）；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning；带 `-historysplit` / `-thinking-injection` / `-historysplit-thinking-injection` 后缀时，分别强制启用默认历史拆分、思考模式提示注入、以及同时启用两者 |
 | `messages` | array | ✅ | OpenAI 风格消息数组 |
 | `stream` | boolean | ❌ | 默认 `false` |
 | `tools` | array | ❌ | Function Calling 定义 |
@@ -488,7 +489,7 @@ anthropic-version: 2023-06-01
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | 例如 `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5`（兼容 `claude-sonnet-4-5`、`claude-3-5-haiku-latest`），并支持历史 Claude 模型 ID；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning |
+| `model` | string | ✅ | 例如 `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5`（兼容 `claude-sonnet-4-5`、`claude-3-5-haiku-latest`），并支持历史 Claude 模型 ID；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning；带 `-historysplit` / `-thinking-injection` / `-historysplit-thinking-injection` 后缀时，会在转换到 OpenAI 兼容链路后启用对应请求级控制 |
 | `messages` | array | ✅ | Claude 风格消息数组 |
 | `max_tokens` | number | ❌ | 缺省自动补 `8192`；当前实现不会硬性截断上游输出 |
 | `stream` | boolean | ❌ | 默认 `false` |
@@ -548,6 +549,7 @@ data: {"type":"message_stop"}
 
 - 默认模型会按各 surface 的既有规则输出 thinking / reasoning 相关增量
 - 带 `-nothinking` 后缀的模型会强制关闭 thinking，即使请求显式传了 `thinking` / `reasoning` / `reasoning_effort` 也不会输出 `thinking_delta`
+- 带 `-historysplit` / `-thinking-injection` / `-historysplit-thinking-injection` 后缀的模型会启用对应请求级控制，不改变回包里的模型名语义
 - 不会输出 `signature_delta`（上游 DeepSeek 未提供可验证签名）
 - `tools` 场景优先避免泄露原始工具 JSON，不强制发送 `input_json_delta`
 
@@ -588,7 +590,7 @@ data: {"type":"message_stop"}
 
 ### `POST /v1beta/models/{model}:generateContent`
 
-请求体兼容 Gemini `contents` / `tools` 字段，模型名可用 alias 自动映射到 DeepSeek 模型；若路径中的模型名带 `-nothinking` 后缀，则最终会映射到对应的无思考模型。
+请求体兼容 Gemini `contents` / `tools` 字段，模型名可用 alias 自动映射到 DeepSeek 模型；若路径中的模型名带 `-nothinking` 后缀，则最终会映射到对应的无思考模型。`-historysplit`、`-thinking-injection`、`-historysplit-thinking-injection` 后缀会在复用 OpenAI 兼容链路的场景中作为请求级控制后缀解析。
 
 响应为 Gemini 兼容结构，核心字段包括：
 

@@ -102,6 +102,24 @@ func TestNormalizeOpenAIChatRequestDisablesThinkingForNoThinkingModel(t *testing
 	}
 }
 
+func TestNormalizeOpenAIChatRequestReadsControlSuffixes(t *testing.T) {
+	cfg := mockOpenAIConfig{wideInput: true}
+	req := map[string]any{
+		"model":    "gpt-4.1-historysplit-thinking-injection",
+		"messages": []any{map[string]any{"role": "user", "content": "hello"}},
+	}
+	out, err := promptcompat.NormalizeOpenAIChatRequest(cfg, req, "")
+	if err != nil {
+		t.Fatalf("promptcompat.NormalizeOpenAIChatRequest error: %v", err)
+	}
+	if out.ResolvedModel != "deepseek-v4-flash" {
+		t.Fatalf("resolved model mismatch: got=%q", out.ResolvedModel)
+	}
+	if !out.ForceCurrentInputFile || !out.ForceThinkingInjection {
+		t.Fatalf("expected both control suffix flags, got current_input=%v thinking_injection=%v", out.ForceCurrentInputFile, out.ForceThinkingInjection)
+	}
+}
+
 func TestNormalizeOpenAIResponsesRequestWideInputPolicyFromInterface(t *testing.T) {
 	req := map[string]any{
 		"model": "deepseek-v4-flash",

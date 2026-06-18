@@ -10,6 +10,8 @@ type StandardRequest struct {
 	Messages                []any
 	HistoryText             string
 	CurrentInputFileApplied bool
+	ForceCurrentInputFile   bool
+	ForceThinkingInjection  bool
 	ToolsRaw                any
 	FinalPrompt             string
 	ToolNames               []string

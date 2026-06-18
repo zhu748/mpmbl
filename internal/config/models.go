@@ -14,7 +14,18 @@ type ModelAliasReader interface {
 	ModelAliases() map[string]string
 }
 
-const noThinkingModelSuffix = "-nothinking"
+const (
+	noThinkingModelSuffix               = "-nothinking"
+	historySplitModelSuffix             = "-historysplit"
+	thinkingInjectionModelSuffix        = "-thinking-injection"
+	historySplitThinkingInjectionSuffix = "-historysplit-thinking-injection"
+)
+
+type ModelSuffixOptions struct {
+	NoThinking        bool
+	HistorySplit      bool
+	ThinkingInjection bool
+}
 
 var deepSeekBaseModels = []ModelInfo{
 	{ID: "deepseek-v4-flash", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
@@ -25,7 +36,7 @@ var deepSeekBaseModels = []ModelInfo{
 	{ID: "deepseek-v4-vision-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
 }
 
-var DeepSeekModels = appendNoThinkingVariants(deepSeekBaseModels)
+var DeepSeekModels = appendModelSuffixVariants(deepSeekBaseModels)
 
 var claudeBaseModels = []ModelInfo{
 	// Current aliases
@@ -57,7 +68,7 @@ var claudeBaseModels = []ModelInfo{
 	{ID: "claude-3-haiku-20240307", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
 }
 
-var ClaudeModels = appendNoThinkingVariants(claudeBaseModels)
+var ClaudeModels = appendModelSuffixVariants(claudeBaseModels)
 
 func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 	baseModel, noThinking := splitNoThinkingModel(model)
@@ -94,8 +105,13 @@ func IsSupportedDeepSeekModel(model string) bool {
 }
 
 func IsNoThinkingModel(model string) bool {
-	_, noThinking := splitNoThinkingModel(model)
-	return noThinking
+	_, opts := splitModelSuffixes(model)
+	return opts.NoThinking
+}
+
+func ModelSuffixOptionsFor(model string) ModelSuffixOptions {
+	_, opts := splitModelSuffixes(model)
+	return opts
 }
 
 func DefaultModelAliases() map[string]string {
@@ -203,23 +219,22 @@ func DefaultModelAliases() map[string]string {
 }
 
 func ResolveModel(store ModelAliasReader, requested string) (string, bool) {
-	model := lower(strings.TrimSpace(requested))
+	model, opts := splitModelSuffixes(requested)
 	if model == "" {
 		return "", false
 	}
 	aliases := loadModelAliases(store)
 	if IsSupportedDeepSeekModel(model) {
-		return model, true
+		return withNoThinkingVariant(model, opts.NoThinking), true
 	}
 	if mapped, ok := aliases[model]; ok && IsSupportedDeepSeekModel(mapped) {
-		return mapped, true
+		return withNoThinkingVariant(mapped, opts.NoThinking), true
 	}
-	baseModel, noThinking := splitNoThinkingModel(model)
-	resolvedModel, ok := resolveCanonicalModel(aliases, baseModel)
+	resolvedModel, ok := resolveCanonicalModel(aliases, model)
 	if !ok {
 		return "", false
 	}
-	return withNoThinkingVariant(resolvedModel, noThinking), true
+	return withNoThinkingVariant(resolvedModel, opts.NoThinking), true
 }
 
 func isRetiredHistoricalModel(model string) bool {
@@ -252,6 +267,14 @@ func OpenAIModelsResponse() map[string]any {
 }
 
 func OpenAIModelByID(store ModelAliasReader, id string) (ModelInfo, bool) {
+	directID := lower(strings.TrimSpace(id))
+	if IsSupportedDeepSeekModel(directID) {
+		for _, model := range DeepSeekModels {
+			if model.ID == directID {
+				return model, true
+			}
+		}
+	}
 	canonical, ok := ResolveModel(store, id)
 	if !ok {
 		return ModelInfo{}, false
@@ -277,23 +300,52 @@ func ClaudeModelsResponse() map[string]any {
 	return resp
 }
 
-func appendNoThinkingVariants(models []ModelInfo) []ModelInfo {
-	out := make([]ModelInfo, 0, len(models)*2)
+func appendModelSuffixVariants(models []ModelInfo) []ModelInfo {
+	suffixes := []string{
+		noThinkingModelSuffix,
+		historySplitModelSuffix,
+		thinkingInjectionModelSuffix,
+		historySplitThinkingInjectionSuffix,
+	}
+	out := make([]ModelInfo, 0, len(models)*(len(suffixes)+1))
 	for _, model := range models {
 		out = append(out, model)
-		variant := model
-		variant.ID = withNoThinkingVariant(model.ID, true)
-		out = append(out, variant)
+		for _, suffix := range suffixes {
+			variant := model
+			variant.ID = model.ID + suffix
+			out = append(out, variant)
+		}
 	}
 	return out
 }
 
 func splitNoThinkingModel(model string) (string, bool) {
+	baseModel, opts := splitModelSuffixes(model)
+	return baseModel, opts.NoThinking
+}
+
+func splitModelSuffixes(model string) (string, ModelSuffixOptions) {
 	model = lower(strings.TrimSpace(model))
-	if strings.HasSuffix(model, noThinkingModelSuffix) {
-		return strings.TrimSuffix(model, noThinkingModelSuffix), true
+	opts := ModelSuffixOptions{}
+	for {
+		switch {
+		case strings.HasSuffix(model, historySplitThinkingInjectionSuffix):
+			model = strings.TrimSuffix(model, historySplitThinkingInjectionSuffix)
+			opts.HistorySplit = true
+			opts.ThinkingInjection = true
+		case strings.HasSuffix(model, thinkingInjectionModelSuffix):
+			model = strings.TrimSuffix(model, thinkingInjectionModelSuffix)
+			opts.ThinkingInjection = true
+		case strings.HasSuffix(model, historySplitModelSuffix):
+			model = strings.TrimSuffix(model, historySplitModelSuffix)
+			opts.HistorySplit = true
+		case strings.HasSuffix(model, noThinkingModelSuffix):
+			model = strings.TrimSuffix(model, noThinkingModelSuffix)
+			opts.NoThinking = true
+		default:
+			return model, opts
+		}
 	}
-	return model, false
 }
 
 func withNoThinkingVariant(model string, enabled bool) string {

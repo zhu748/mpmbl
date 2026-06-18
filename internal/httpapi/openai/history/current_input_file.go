@@ -19,10 +19,21 @@ const (
 )
 
 func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth, stdReq promptcompat.StandardRequest) (promptcompat.StandardRequest, error) {
-	if s.DS == nil || s.Store == nil || a == nil || !s.Store.CurrentInputFileEnabled() {
+	if s.DS == nil || a == nil {
 		return stdReq, nil
 	}
-	threshold := s.Store.CurrentInputFileMinChars()
+	enabled := stdReq.ForceCurrentInputFile
+	threshold := 0
+	if s.Store != nil {
+		enabled = enabled || s.Store.CurrentInputFileEnabled()
+		threshold = s.Store.CurrentInputFileMinChars()
+	}
+	if !enabled {
+		return stdReq, nil
+	}
+	if stdReq.ForceCurrentInputFile {
+		threshold = 0
+	}
 
 	index, text := latestUserInputForFile(stdReq.Messages)
 	if index < 0 {

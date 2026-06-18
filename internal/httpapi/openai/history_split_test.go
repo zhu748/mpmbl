@@ -214,6 +214,34 @@ func TestApplyThinkingInjectionUsesCustomPrompt(t *testing.T) {
 	}
 }
 
+func TestApplyThinkingInjectionModelSuffixForcesDefaultPrompt(t *testing.T) {
+	ds := &inlineUploadDSStub{}
+	h := &openAITestSurface{
+		Store: mockOpenAIConfig{
+			wideInput: true,
+		},
+		DS: ds,
+	}
+	req := map[string]any{
+		"model": "deepseek-v4-flash-thinking-injection",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "hello"},
+		},
+	}
+	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+
+	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
+	if err != nil {
+		t.Fatalf("apply thinking injection failed: %v", err)
+	}
+	if !strings.Contains(out.FinalPrompt, "hello\n\n"+promptcompat.ThinkingInjectionMarker) {
+		t.Fatalf("expected suffix-forced thinking injection, got %s", out.FinalPrompt)
+	}
+}
+
 func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{
@@ -244,6 +272,37 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	}
 	if !strings.Contains(out.FinalPrompt, "first user turn") || !strings.Contains(out.FinalPrompt, "latest user turn") {
 		t.Fatalf("expected original prompt context to stay inline, got %s", out.FinalPrompt)
+	}
+}
+
+func TestApplyCurrentInputFileModelSuffixForcesUpload(t *testing.T) {
+	ds := &inlineUploadDSStub{}
+	h := &openAITestSurface{
+		Store: mockOpenAIConfig{
+			wideInput:           true,
+			currentInputEnabled: false,
+			currentInputMin:     100000,
+		},
+		DS: ds,
+	}
+	req := map[string]any{
+		"model":    "deepseek-v4-flash-historysplit",
+		"messages": historySplitTestMessages(),
+	}
+	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+
+	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
+	if err != nil {
+		t.Fatalf("apply current input file failed: %v", err)
+	}
+	if len(ds.uploadCalls) != 1 {
+		t.Fatalf("expected one suffix-forced upload, got %d", len(ds.uploadCalls))
+	}
+	if !out.CurrentInputFileApplied || out.HistoryText == "" {
+		t.Fatalf("expected current input file to apply, got current_input=%v history=%q", out.CurrentInputFileApplied, out.HistoryText)
 	}
 }
 

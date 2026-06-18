@@ -3,10 +3,19 @@ package shared
 import "ds2api/internal/promptcompat"
 
 func ApplyThinkingInjection(store ConfigReader, stdReq promptcompat.StandardRequest) promptcompat.StandardRequest {
-	if store == nil || !store.ThinkingInjectionEnabled() || !stdReq.Thinking {
+	if !stdReq.Thinking {
 		return stdReq
 	}
-	messages, changed := promptcompat.AppendThinkingInjectionPromptToLatestUser(stdReq.Messages, store.ThinkingInjectionPrompt())
+	enabled := stdReq.ForceThinkingInjection
+	prompt := ""
+	if store != nil {
+		enabled = enabled || store.ThinkingInjectionEnabled()
+		prompt = store.ThinkingInjectionPrompt()
+	}
+	if !enabled {
+		return stdReq
+	}
+	messages, changed := promptcompat.AppendThinkingInjectionPromptToLatestUser(stdReq.Messages, prompt)
 	if !changed {
 		return stdReq
 	}
