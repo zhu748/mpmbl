@@ -70,7 +70,7 @@ func TestBuildOpenAICurrentInputContextTranscriptUsesInjectedFileWrapper(t *test
 	if !strings.HasPrefix(transcript, "[file content end]\n\n") {
 		t.Fatalf("expected injected file wrapper prefix, got %q", transcript)
 	}
-	if !strings.Contains(transcript, "<｜begin▁of▁sentence｜>") {
+	if !strings.Contains(transcript, "<|begin▁of▁sentence|>") {
 		t.Fatalf("expected serialized conversation markers, got %q", transcript)
 	}
 	if !strings.Contains(transcript, "first user turn") || !strings.Contains(transcript, "tool result") {
@@ -343,7 +343,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithInjectedWrapper(t *testing.T) 
 	if !strings.HasPrefix(uploadedText, "[file content end]\n\n") {
 		t.Fatalf("expected injected file wrapper prefix, got %q", uploadedText)
 	}
-	if !strings.Contains(uploadedText, "<｜begin▁of▁sentence｜><｜User｜>first turn content that is long enough") {
+	if !strings.Contains(uploadedText, "<|begin▁of▁sentence|>") || !strings.Contains(uploadedText, "<|User|>first turn content that is long enough") {
 		t.Fatalf("expected serialized current user turn markers, got %q", uploadedText)
 	}
 	if !strings.Contains(uploadedText, promptcompat.ThinkingInjectionMarker) {

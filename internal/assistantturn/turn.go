@@ -97,7 +97,7 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 		text = shared.ReplaceCitationMarkersWithLinks(text, result.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(result.Text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
+	parsed := shared.DetectAssistantToolCalls(result.Text, text, result.Thinking, result.ToolDetectionThinking, opts.ToolNames)
 	calls := toolcall.NormalizeParsedToolCallsForSchemas(parsed.Calls, opts.ToolsRaw)
 	parsed.Calls = calls
 
@@ -139,7 +139,7 @@ func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Tur
 		text = shared.ReplaceCitationMarkersWithLinks(text, snapshot.CitationLinks)
 	}
 
-	parsed := shared.DetectAssistantToolCalls(snapshot.RawText, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
+	parsed := shared.DetectAssistantToolCalls(snapshot.RawText, text, snapshot.RawThinking, snapshot.DetectionThinking, opts.ToolNames)
 	calls := parsed.Calls
 	if len(calls) == 0 && len(snapshot.AdditionalToolCalls) > 0 {
 		calls = snapshot.AdditionalToolCalls

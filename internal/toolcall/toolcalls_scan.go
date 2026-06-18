@@ -280,14 +280,6 @@ func consumeToolMarkupNamePrefixOnce(text string, idx int) (int, bool) {
 		}
 		return next, true
 	}
-	if next, ok := consumeToolKeyword(text, idx, "dmsl"); ok {
-		if dashLen := toolMarkupDashLenAt(text, next); dashLen > 0 {
-			next += dashLen
-		} else if underscoreLen := toolMarkupUnderscoreLenAt(text, next); underscoreLen > 0 {
-			next += underscoreLen
-		}
-		return next, true
-	}
 	if next, ok := consumeArbitraryToolMarkupNamePrefix(text, idx); ok {
 		return next, true
 	}
@@ -491,18 +483,16 @@ func isToolMarkupTagTerminator(text string, idx int) bool {
 	if idx >= len(text) {
 		return false
 	}
-	if xmlTagEndDelimiterLenAt(text, idx) > 0 {
+	if text[idx] == '>' {
 		return true
 	}
-	return false
+	r, _ := utf8.DecodeRuneInString(text[idx:])
+	return normalizeFullwidthASCII(r) == '>'
 }
 
 func consumeToolMarkupSeparator(text string, idx int) (int, bool) {
 	idx = skipToolMarkupIgnorables(text, idx)
 	if idx >= len(text) {
-		return idx, false
-	}
-	if xmlTagEndDelimiterLenAt(text, idx) > 0 {
 		return idx, false
 	}
 	r, size := utf8.DecodeRuneInString(text[idx:])

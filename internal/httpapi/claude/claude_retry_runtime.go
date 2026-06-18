@@ -171,7 +171,7 @@ func shouldRetryClaudeNonStream(result claudeNonStreamResult, attempts int) bool
 
 // detectClaudeToolCalls 检测 Claude 格式的工具调用
 func detectClaudeToolCalls(text, thinking, toolDetectionThinking string, toolNames []string) toolcall.ToolCallParseResult {
-	return shared.DetectAssistantToolCalls(text, thinking, toolDetectionThinking, toolNames)
+	return shared.DetectAssistantToolCalls(text, text, thinking, toolDetectionThinking, toolNames)
 }
 
 // 流式重试处理

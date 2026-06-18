@@ -19,18 +19,44 @@ func TestSanitizeLeakedOutputRemovesLeakedWireToolCallAndResult(t *testing.T) {
 }
 
 func TestSanitizeLeakedOutputRemovesStandaloneMetaMarkers(t *testing.T) {
-	raw := "A<| end_of_sentence |><| Assistant |>B<| end_of_thinking |>C<｜end▁of▁thinking｜>D<｜end▁of▁sentence｜>E<| end_of_toolresults |>F<｜end▁of▁instructions｜>G"
+	raw := "A<| end_of_sentence |><| Assistant |>B<| end_of_thinking |>C<|end▁of▁thinking|>D<|end▁of▁sentence|>E<| end_of_toolresults |>F<|end▁of▁instructions|>G"
 	got := sanitizeLeakedOutput(raw)
 	if got != "ABCDEFG" {
 		t.Fatalf("unexpected sanitize result for meta markers: %q", got)
 	}
 }
 
+func TestSanitizeLeakedOutputRemovesFullwidthDelimitedMetaMarkers(t *testing.T) {
+	fw := "\uff5c"
+	raw := "A<" + fw + "end▁of▁sentence" + fw + ">B<" + fw + " Assistant " + fw + ">C<" + fw + "end_of_toolresults" + fw + ">D"
+	got := sanitizeLeakedOutput(raw)
+	if got != "ABCD" {
+		t.Fatalf("unexpected sanitize result for fullwidth-delimited meta markers: %q", got)
+	}
+}
+
 func TestSanitizeLeakedOutputRemovesThinkAndBosMarkers(t *testing.T) {
-	raw := "A<think>B</think>C<｜begin▁of▁sentence｜>D<| begin_of_sentence |>E<｜begin_of_sentence｜>F"
+	raw := "A<think>B</think>C<|begin▁of▁sentence|>D<| begin_of_sentence |>E<|begin_of_sentence|>F"
 	got := sanitizeLeakedOutput(raw)
 	if got != "ABCDEF" {
 		t.Fatalf("unexpected sanitize result for think/BOS markers: %q", got)
+	}
+}
+
+func TestSanitizeLeakedOutputRemovesThoughtMarkers(t *testing.T) {
+	raw := "A<|▁of▁thought|>B<| of_thought |>C<| begin_of_thought |>D<| end_of_thought |>E"
+	got := sanitizeLeakedOutput(raw)
+	if got != "ABCDE" {
+		t.Fatalf("unexpected sanitize result for leaked thought markers: %q", got)
+	}
+}
+
+func TestSanitizeLeakedOutputRemovesFullwidthDelimitedBosAndThoughtMarkers(t *testing.T) {
+	fw := "\uff5c"
+	raw := "A<" + fw + "begin▁of▁sentence" + fw + ">B<" + fw + "▁of▁thought" + fw + ">C<" + fw + " begin_of_thought " + fw + ">D"
+	got := sanitizeLeakedOutput(raw)
+	if got != "ABCD" {
+		t.Fatalf("unexpected sanitize result for fullwidth-delimited BOS/thought markers: %q", got)
 	}
 }
 
@@ -39,6 +65,14 @@ func TestSanitizeLeakedOutputRemovesDanglingThinkBlock(t *testing.T) {
 	got := sanitizeLeakedOutput(raw)
 	if got != "Answer prefix" {
 		t.Fatalf("unexpected sanitize result for dangling think block: %q", got)
+	}
+}
+
+func TestSanitizeLeakedOutputRemovesCompleteDSMLToolCallWrapper(t *testing.T) {
+	raw := "前置文本\n<|DSML|tool_calls>\n<|DSML|invoke name=\"Bash\">\n<|DSML|parameter name=\"command\"></|DSML|parameter>\n</|DSML|invoke>\n</|DSML|tool_calls>\n后置文本"
+	got := sanitizeLeakedOutput(raw)
+	if got != "前置文本\n\n后置文本" {
+		t.Fatalf("unexpected sanitize result for leaked dsml wrapper: %q", got)
 	}
 }
 

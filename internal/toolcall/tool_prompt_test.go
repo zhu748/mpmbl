@@ -111,70 +111,21 @@ func TestBuildToolCallInstructions_WriteUsesFilePathAndContent(t *testing.T) {
 
 func TestBuildToolCallInstructions_AnchorsMissingOpeningWrapperFailureMode(t *testing.T) {
 	out := BuildToolCallInstructions([]string{"read_file"})
-	if !strings.Contains(out, "Never omit the opening <|DSML|tool_calls> tag") {
+	if !strings.Contains(out, "Always include the opening <|DSML|tool_calls> tag") {
 		t.Fatalf("expected explicit missing-opening-tag warning, got: %s", out)
 	}
-	if !strings.Contains(out, "Wrong 3 — missing opening wrapper") {
+	if !strings.Contains(out, "Incorrect 3 — opening wrapper omitted") {
 		t.Fatalf("expected missing-opening-wrapper negative example, got: %s", out)
-	}
-}
-
-func TestBuildToolCallInstructions_ExplicitlyRejectsCompatibilityAliases(t *testing.T) {
-	out := BuildToolCallInstructions([]string{"read_file"})
-	for _, want := range []string{
-		"Output ONLY the canonical DSML form shown above.",
-		"Do not intentionally switch to DMSL",
-		"Wrong 5 — using compatibility aliases instead of canonical DSML",
-		"<|DMSL|tool_calls>...</|DMSL|tool_calls>",
-		"<tool_calls>...</tool_calls>",
-		"<dmsl-tool_calls>...</dmsl-tool_calls>",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected compatibility-alias warning %q, got: %s", want, out)
-		}
-	}
-}
-
-func TestBuildToolCallInstructions_RequiresImmediateStopAfterToolBlock(t *testing.T) {
-	out := BuildToolCallInstructions([]string{"read_file"})
-	want := "If you call a tool, end your response immediately after </|DSML|tool_calls>. Do not add any trailing prose."
-	if !strings.Contains(out, want) {
-		t.Fatalf("expected trailing-prose stop rule %q, got: %s", want, out)
-	}
-}
-
-func TestBuildToolCallInstructions_ListsAvailableToolNamesCaseSensitively(t *testing.T) {
-	out := BuildToolCallInstructions([]string{"Read", "execute_command", "Read", "  "})
-	for _, want := range []string{
-		"AVAILABLE TOOL NAMES (case-sensitive, use exactly as listed):",
-		"- Read",
-		"- execute_command",
-		"The tool name exactly matches one available tool name, including case.",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected available-tool-name anchor %q, got: %s", want, out)
-		}
-	}
-	if strings.Count(out, "- Read") != 1 {
-		t.Fatalf("expected deduplicated tool name list, got: %s", out)
-	}
-}
-
-func TestBuildToolCallInstructions_NoToolsSuppliedWarnsAgainstFabrication(t *testing.T) {
-	out := BuildToolCallInstructions(nil)
-	want := "- (No tool names supplied in this request. If tools are unavailable, answer normally instead of fabricating a tool call.)"
-	if !strings.Contains(out, want) {
-		t.Fatalf("expected no-tools warning %q, got: %s", want, out)
 	}
 }
 
 func TestBuildToolCallInstructions_RejectsEmptyParametersInPrompt(t *testing.T) {
 	out := BuildToolCallInstructions([]string{"Bash"})
 	for _, want := range []string{
-		"Do not emit placeholder, blank, or whitespace-only parameters.",
-		"If a required parameter value is unknown, ask the user or answer normally instead of outputting an empty tool call.",
-		"Never call them with an empty command.",
-		"Wrong 4 — empty parameters",
+		"Never output placeholder, empty, or whitespace-only parameters.",
+		"When a required parameter value is unknown, ask the user or reply normally rather than emitting an empty tool call.",
+		"Never invoke them with an empty command.",
+		"Incorrect 4 — empty parameters",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected empty-parameter instruction %q, got: %s", want, out)
@@ -184,25 +135,13 @@ func TestBuildToolCallInstructions_RejectsEmptyParametersInPrompt(t *testing.T) 
 
 func TestBuildToolCallInstructions_UsesPositiveTagPunctuationAlphabet(t *testing.T) {
 	out := BuildToolCallInstructions([]string{"Bash"})
-	want := `Tag punctuation alphabet: ASCII < > / = " plus the halfwidth pipe |.`
+	want := `Permitted tag punctuation: the ASCII characters < > / = " along with the halfwidth pipe |.`
 	if !strings.Contains(out, want) {
 		t.Fatalf("expected positive tag punctuation alphabet %q, got: %s", want, out)
 	}
 	for _, bad := range []string{"lookalike", "substitute", "！", "〈", "〉", "“", "”", "、"} {
 		if strings.Contains(out, bad) {
 			t.Fatalf("tool prompt should not include negative punctuation examples %q, got: %s", bad, out)
-		}
-	}
-}
-
-func TestBuildToolCallInstructions_ExplicitlyRejectsPhaseReportsAndCommandPreviews(t *testing.T) {
-	out := BuildToolCallInstructions([]string{"PowerShell"})
-	for _, want := range []string{
-		"progress reports, stage headers, or command previews outside the tool block",
-		"There are no phase summaries, status notes, or standalone command lines before <|DSML|tool_calls>.",
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected stronger no-preamble guidance %q, got: %s", want, out)
 		}
 	}
 }

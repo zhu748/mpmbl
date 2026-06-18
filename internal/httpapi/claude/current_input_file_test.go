@@ -71,19 +71,19 @@ type claudeCurrentInputStore struct {
 	mockClaudeConfig
 }
 
-func (s claudeCurrentInputStore) CompatWideInputStrictOutput() bool { return false }
-func (s claudeCurrentInputStore) ToolcallMode() string { return "" }
+func (s claudeCurrentInputStore) CompatWideInputStrictOutput() bool   { return false }
+func (s claudeCurrentInputStore) ToolcallMode() string                { return "" }
 func (s claudeCurrentInputStore) ToolcallEarlyEmitConfidence() string { return "" }
-func (s claudeCurrentInputStore) ResponsesStoreTTLSeconds() int { return 0 }
-func (s claudeCurrentInputStore) EmbeddingsProvider() string { return "" }
-func (s claudeCurrentInputStore) AutoDeleteMode() string { return "none" }
-func (s claudeCurrentInputStore) AutoDeleteSessions() bool { return false }
-func (s claudeCurrentInputStore) HistorySplitEnabled() bool { return false }
-func (s claudeCurrentInputStore) HistorySplitTriggerAfterTurns() int { return 0 }
-func (s claudeCurrentInputStore) CurrentInputFileEnabled() bool { return true }
-func (s claudeCurrentInputStore) CurrentInputFileMinChars() int { return 0 }
-func (s claudeCurrentInputStore) ThinkingInjectionEnabled() bool { return false }
-func (s claudeCurrentInputStore) ThinkingInjectionPrompt() string { return "" }
+func (s claudeCurrentInputStore) ResponsesStoreTTLSeconds() int       { return 0 }
+func (s claudeCurrentInputStore) EmbeddingsProvider() string          { return "" }
+func (s claudeCurrentInputStore) AutoDeleteMode() string              { return "none" }
+func (s claudeCurrentInputStore) AutoDeleteSessions() bool            { return false }
+func (s claudeCurrentInputStore) HistorySplitEnabled() bool           { return false }
+func (s claudeCurrentInputStore) HistorySplitTriggerAfterTurns() int  { return 0 }
+func (s claudeCurrentInputStore) CurrentInputFileEnabled() bool       { return true }
+func (s claudeCurrentInputStore) CurrentInputFileMinChars() int       { return 0 }
+func (s claudeCurrentInputStore) ThinkingInjectionEnabled() bool      { return false }
+func (s claudeCurrentInputStore) ThinkingInjectionPrompt() string     { return "" }
 
 func TestClaudeDirectAppliesCurrentInputFile(t *testing.T) {
 	ds := &claudeCurrentInputDS{}

@@ -14,15 +14,6 @@ type ToolCallParseResult struct {
 	SawToolCallSyntax bool
 	RejectedByPolicy  bool
 	RejectedToolNames []string
-	// SourceText is the raw text actually parsed to produce this result.
-	// It may differ from the primary rawText when the parser fell back to
-	// the thinking block. RunShadowDiff uses this to ensure both sides
-	// compare against the same input.
-	SourceText string
-	// AvailableNames is the tool-name list passed to the parser. Stored here
-	// so RunShadowDiff can replay buildParseCandidate with the same input
-	// and obtain a valid nameWhitelistHit confidence signal.
-	AvailableNames []string
 }
 
 func ParseToolCalls(text string, availableToolNames []string) []ParsedToolCall {
@@ -30,7 +21,7 @@ func ParseToolCalls(text string, availableToolNames []string) []ParsedToolCall {
 }
 
 func ParseToolCallsDetailed(text string, availableToolNames []string) ToolCallParseResult {
-	return parseToolCallsDetailedXMLOnly(text, availableToolNames)
+	return parseToolCallsDetailedXMLOnly(text)
 }
 
 func ParseStandaloneToolCalls(text string, availableToolNames []string) []ParsedToolCall {
@@ -38,7 +29,7 @@ func ParseStandaloneToolCalls(text string, availableToolNames []string) []Parsed
 }
 
 func ParseStandaloneToolCallsDetailed(text string, availableToolNames []string) ToolCallParseResult {
-	return parseToolCallsDetailedXMLOnly(text, availableToolNames)
+	return parseToolCallsDetailedXMLOnly(text)
 }
 
 func ParseAssistantToolCallsDetailed(text, thinking string, availableToolNames []string) ToolCallParseResult {
@@ -56,84 +47,40 @@ func ParseAssistantToolCallsDetailed(text, thinking string, availableToolNames [
 	return textParsed
 }
 
-// parseCandidate is the private intermediate representation produced by the
-// parser pipeline. It is kept separate from ToolCallParseResult so that M2
-// can attach additional confidence signals without modifying the public API.
-type parseCandidate struct {
-	sawToolCallSyntax bool
-	calls             []ParsedToolCall
-	rejectedToolNames []string
-	rejectedByPolicy  bool
-	// M2 confidence signals – internal only, surfaced via structured logs.
-	parsePath        string // see parsePathXxx constants in toolcalls_candidates.go
-	ambiguous        bool   // true when both DSML and canonical wrapper syntax coexist
-	nameWhitelistHit bool   // true when ≥1 parsed call name is in availableNames
-}
-
-func (c parseCandidate) toResult() ToolCallParseResult {
-	return ToolCallParseResult{
-		Calls:             c.calls,
-		SawToolCallSyntax: c.sawToolCallSyntax,
-		RejectedByPolicy:  c.rejectedByPolicy,
-		RejectedToolNames: c.rejectedToolNames,
-	}
-}
-
-func parseToolCallsDetailedXMLOnly(text string, availableNames []string) ToolCallParseResult {
-	r := buildParseCandidate(text, availableNames).toResult()
-	r.SourceText = text
-	r.AvailableNames = availableNames
-	return r
-}
-
-func buildParseCandidate(text string, availableNames []string) parseCandidate {
-	cand := parseCandidate{}
+func parseToolCallsDetailedXMLOnly(text string) ToolCallParseResult {
+	result := ToolCallParseResult{}
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		cand.parsePath = parsePathEmpty
-		return cand
+		return result
 	}
 	trimmed = stripFencedCodeBlocks(trimmed)
 	trimmed = strings.TrimSpace(trimmed)
 	if trimmed == "" {
-		cand.parsePath = parsePathStrippedEmpty
-		return cand
+		return result
 	}
 
 	normalized, ok := normalizeDSMLToolCallMarkup(trimmed)
 	if !ok {
-		cand.parsePath = parsePathNormalizeFailed
-		return cand
+		return result
 	}
-	cand.sawToolCallSyntax = looksLikeToolCallSyntax(normalized) || hasRepairableXMLToolCallsWrapper(normalized)
-	hasDSML, hasCanonical := ContainsToolCallWrapperSyntaxOutsideIgnored(normalized)
-	cand.ambiguous = hasDSML && hasCanonical
+	result.SawToolCallSyntax = looksLikeToolCallSyntax(normalized) || hasRepairableXMLToolCallsWrapper(normalized)
 	parsed := parseXMLToolCalls(normalized)
-	usedCDATARecover := false
 	if len(parsed) == 0 && indexToolCDATAOpen(normalized, 0) >= 0 {
 		recovered := SanitizeLooseCDATA(normalized)
 		if recovered != normalized {
 			parsed = parseXMLToolCalls(recovered)
-			if len(parsed) > 0 {
-				usedCDATARecover = true
-			}
 		}
 	}
 	if len(parsed) == 0 {
-		cand.parsePath = parsePathXMLFailed
-		return cand
+		return result
 	}
 
-	cand.sawToolCallSyntax = true
-	cand.calls, cand.rejectedToolNames = filterToolCallsDetailed(parsed)
-	cand.rejectedByPolicy = len(cand.rejectedToolNames) > 0 && len(cand.calls) == 0
-	if usedCDATARecover {
-		cand.parsePath = parsePathXMLCDATARecover
-	} else {
-		cand.parsePath = parsePathXMLDirect
-	}
-	cand.nameWhitelistHit = namesHitWhitelist(cand.calls, availableNames)
-	return cand
+	result.SawToolCallSyntax = true
+	calls, rejectedNames := filterToolCallsDetailed(parsed)
+	result.Calls = calls
+	result.RejectedToolNames = rejectedNames
+	result.RejectedByPolicy = len(rejectedNames) > 0 && len(calls) == 0
+	return result
 }
 
 func filterToolCallsDetailed(parsed []ParsedToolCall) ([]ParsedToolCall, []string) {

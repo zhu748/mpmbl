@@ -9,8 +9,7 @@ import "strings"
 // The toolNames slice should contain the actual tool names available in the
 // current request; the function picks real names for examples.
 func BuildToolCallInstructions(toolNames []string) string {
-	names := uniqueToolNames(toolNames)
-	return `TOOL CALL FORMAT — FOLLOW EXACTLY:
+	return `TOOL INVOCATION SCHEMA — MATCH IT EXACTLY:
 
 <|DSML|tool_calls>
   <|DSML|invoke name="TOOL_NAME_HERE">
@@ -18,67 +17,50 @@ func BuildToolCallInstructions(toolNames []string) string {
   </|DSML|invoke>
 </|DSML|tool_calls>
 
-RULES:
-1) Use the <|DSML|tool_calls> wrapper format.
-2) Put one or more <|DSML|invoke> entries under a single <|DSML|tool_calls> root.
-3) Put the tool name in the invoke name attribute: <|DSML|invoke name="TOOL_NAME">.
-3a) Tag punctuation alphabet: ASCII < > / = " plus the halfwidth pipe |.
-4) All string values must use <![CDATA[...]]>, even short ones. This includes code, scripts, file contents, prompts, paths, names, and queries.
-5) Every top-level argument must be a <|DSML|parameter name="ARG_NAME">...</|DSML|parameter> node.
-6) Objects use nested XML elements inside the parameter body. Arrays may repeat <item> children.
-7) Numbers, booleans, and null stay plain text.
-8) Use only the parameter names in the tool schema. Do not invent fields.
-9) Fill parameters with the actual values required for this call. Do not emit placeholder, blank, or whitespace-only parameters.
-10) If a required parameter value is unknown, ask the user or answer normally instead of outputting an empty tool call.
-11) For shell tools such as Bash / execute_command, the command/script must be inside the command parameter. Never call them with an empty command.
-12) Do NOT wrap XML in markdown fences. Do NOT output explanations, role markers, internal monologue, progress reports, stage headers, or command previews outside the tool block.
-13) If you call a tool, the first non-whitespace characters of that tool block must be exactly <|DSML|tool_calls>.
-14) Never omit the opening <|DSML|tool_calls> tag, even if you already plan to close with </|DSML|tool_calls>.
-15) Output ONLY the canonical DSML form shown above. Do not intentionally switch to DMSL, lowercase aliases, hyphen/underscore aliases, hash/star pipe aliases, or the legacy <tool_calls> / <invoke> / <parameter> tags.
-16) Compatibility note: the runtime may recover some malformed or legacy variants, but that recovery exists only as a fallback. Your job is to emit the exact canonical DSML form on the first try.
-17) If you call a tool, end your response immediately after </|DSML|tool_calls>. Do not add any trailing prose.
+REQUIREMENTS:
+1) Wrap each tool invocation in the <|DSML|tool_calls> block.
+2) Place one or more <|DSML|invoke> entries inside a single <|DSML|tool_calls> root element.
+3) Carry the tool name in the invoke name attribute, e.g. <|DSML|invoke name="TOOL_NAME">.
+3a) Permitted tag punctuation: the ASCII characters < > / = " along with the halfwidth pipe |.
+4) Wrap every string value in <![CDATA[...]]> without exception, however brief. This covers code, shell scripts, file bodies, prompts, paths, identifiers, and search queries.
+5) Render each top-level argument as its own <|DSML|parameter name="ARG_NAME">...</|DSML|parameter> node.
+6) Encode objects as nested XML elements within the parameter body; encode arrays by repeating <item> children.
+7) Keep numbers, booleans, and null as plain text.
+8) Use only the parameter names declared by the tool schema; never fabricate fields.
+9) Populate parameters with the genuine values this call needs. Never output placeholder, empty, or whitespace-only parameters.
+10) When a required parameter value is unknown, ask the user or reply normally rather than emitting an empty tool call.
+11) For shell-style tools like Bash or execute_command, the command or script must live inside the command parameter. Never invoke them with an empty command.
+12) Never wrap the XML in markdown fences. Omit explanations, role markers, and internal monologue from the output.
+13) When you call a tool, the first non-whitespace characters of the tool block must be precisely <|DSML|tool_calls>.
+14) Always include the opening <|DSML|tool_calls> tag, even when you intend to close with </|DSML|tool_calls>.
+15) Compatibility note: the runtime can still parse the legacy XML tags <tool_calls> / <invoke> / <parameter>, but you should favor the DSML-prefixed form shown above.
 
-AVAILABLE TOOL NAMES (case-sensitive, use exactly as listed):
-` + buildAvailableToolNamesSection(names) + `
-
-PARAMETER SHAPES:
+ARGUMENT SHAPES:
 - string => <|DSML|parameter name="x"><![CDATA[value]]></|DSML|parameter>
 - object => <|DSML|parameter name="x"><field>...</field></|DSML|parameter>
 - array => <|DSML|parameter name="x"><item>...</item><item>...</item></|DSML|parameter>
 - number/bool/null => <|DSML|parameter name="x">plain_text</|DSML|parameter>
 
-【WRONG — Do NOT do these】:
+【INCORRECT — AVOID THESE PATTERNS】:
 
-Wrong 1 — mixed text after XML:
+Incorrect 1 — prose trailing the XML:
   <|DSML|tool_calls>...</|DSML|tool_calls> I hope this helps.
-Wrong 2 — Markdown code fences:
+Incorrect 2 — Markdown code fences:
   ` + "```xml" + `
   <|DSML|tool_calls>...</|DSML|tool_calls>
   ` + "```" + `
-Wrong 3 — missing opening wrapper:
+Incorrect 3 — opening wrapper omitted:
   <|DSML|invoke name="TOOL_NAME">...</|DSML|invoke>
   </|DSML|tool_calls>
-Wrong 4 — empty parameters:
+Incorrect 4 — empty parameters:
   <|DSML|tool_calls>
     <|DSML|invoke name="Bash">
       <|DSML|parameter name="command"></|DSML|parameter>
     </|DSML|invoke>
   </|DSML|tool_calls>
-Wrong 5 — using compatibility aliases instead of canonical DSML:
-  <|DMSL|tool_calls>...</|DMSL|tool_calls>
-  <tool_calls>...</tool_calls>
-  <dmsl-tool_calls>...</dmsl-tool_calls>
 
-FINAL CHECK BEFORE SENDING A TOOL CALL:
-- The tool name exactly matches one available tool name, including case.
-- Every parameter name exactly matches the schema.
-- Every string value is wrapped in <![CDATA[...]]>.
-- There is no prose before or after the tool block.
-- The response ends immediately after </|DSML|tool_calls>.
-- There are no phase summaries, status notes, or standalone command lines before <|DSML|tool_calls>.
-
-Remember: The ONLY valid way to use tools is the <|DSML|tool_calls>...</|DSML|tool_calls> block at the end of your response.
-` + buildCorrectToolExamples(names)
+Reminder: the sole valid way to use tools is the <|DSML|tool_calls>...</|DSML|tool_calls> block placed at the end of your response.
+` + buildCorrectToolExamples(toolNames)
 }
 
 type promptToolExample struct {
@@ -91,25 +73,25 @@ func buildCorrectToolExamples(toolNames []string) string {
 	examples := make([]string, 0, 4)
 
 	if single, ok := firstBasicExample(names); ok {
-		examples = append(examples, "Example A — Single tool:\n"+renderToolExampleBlock([]promptToolExample{single}))
+		examples = append(examples, "Sample A — single tool:\n"+renderToolExampleBlock([]promptToolExample{single}))
 	}
 
 	if parallel := firstNBasicExamples(names, 2); len(parallel) >= 2 {
-		examples = append(examples, "Example B — Two tools in parallel:\n"+renderToolExampleBlock(parallel))
+		examples = append(examples, "Sample B — two tools in parallel:\n"+renderToolExampleBlock(parallel))
 	}
 
 	if nested, ok := firstNestedExample(names); ok {
-		examples = append(examples, "Example C — Tool with nested XML parameters:\n"+renderToolExampleBlock([]promptToolExample{nested}))
+		examples = append(examples, "Sample C — tool with nested XML parameters:\n"+renderToolExampleBlock([]promptToolExample{nested}))
 	}
 
 	if script, ok := firstScriptExample(names); ok {
-		examples = append(examples, "Example D — Tool with long script using CDATA (RELIABLE FOR CODE/SCRIPTS):\n"+renderToolExampleBlock([]promptToolExample{script}))
+		examples = append(examples, "Sample D — tool with a long script wrapped in CDATA (RELIABLE FOR CODE/SCRIPTS):\n"+renderToolExampleBlock([]promptToolExample{script}))
 	}
 
 	if len(examples) == 0 {
 		return ""
 	}
-	return "【CORRECT EXAMPLES】:\n\n" + strings.Join(examples, "\n\n") + "\n\n"
+	return "【CORRECT SAMPLES】:\n\n" + strings.Join(examples, "\n\n") + "\n\n"
 }
 
 func uniqueToolNames(toolNames []string) []string {
@@ -124,17 +106,6 @@ func uniqueToolNames(toolNames []string) []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-func buildAvailableToolNamesSection(names []string) string {
-	if len(names) == 0 {
-		return "- (No tool names supplied in this request. If tools are unavailable, answer normally instead of fabricating a tool call.)"
-	}
-	lines := make([]string, 0, len(names))
-	for _, name := range names {
-		lines = append(lines, "- "+name)
-	}
-	return strings.Join(lines, "\n")
 }
 
 func firstBasicExample(names []string) (promptToolExample, bool) {

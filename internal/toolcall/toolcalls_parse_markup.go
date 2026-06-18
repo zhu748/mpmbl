@@ -445,10 +445,8 @@ func findXMLTagEnd(text string, from int) int {
 			i += size
 			continue
 		}
-		for _, variant := range []string{">", "＞", "﹥", "〉"} {
-			if strings.HasPrefix(text[i:], variant) {
-				return i + len(variant) - 1
-			}
+		if ch == '>' {
+			return i + size - 1
 		}
 		i += size
 	}

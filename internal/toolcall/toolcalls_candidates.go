@@ -6,17 +6,6 @@ import (
 	"unicode/utf8"
 )
 
-// parsePath constants describe which code path was taken during parsing.
-// These values are internal to parseCandidate and only surfaced via logs.
-const (
-	parsePathEmpty           = "empty"             // input was empty / all whitespace
-	parsePathStrippedEmpty   = "stripped_empty"    // content existed only inside fenced code blocks
-	parsePathNormalizeFailed = "normalize_failed"  // DSML normalisation returned an error
-	parsePathXMLFailed       = "xml_parse_failed"  // normalised text yielded no XML tool calls
-	parsePathXMLDirect       = "xml_direct"        // XML parsed successfully on the first attempt
-	parsePathXMLCDATARecover = "xml_cdata_recover" // XML parsed only after loose-CDATA sanitisation
-)
-
 type canonicalToolMarkupAttr struct {
 	Key   string
 	Value string
@@ -268,11 +257,6 @@ func normalizeCanonicalToolAttrKey(raw string) string {
 			return "name"
 		}
 	}
-	if next, ok := consumeToolKeyword(trimmed, 0, "value"); ok {
-		if skipToolMarkupIgnorables(trimmed, next) == len(trimmed) {
-			return "value"
-		}
-	}
 	return ""
 }
 
@@ -450,7 +434,7 @@ func foldToolKeywordRune(r rune) (byte, bool) {
 	}
 	r = unicode.ToLower(r)
 	switch r {
-	case 'a', 'c', 'd', 'e', 'i', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'v':
+	case 'a', 'c', 'd', 'e', 'i', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'v':
 		return byte(r), true
 	case 'а', 'Α', 'α':
 		return 'a', true
@@ -590,10 +574,11 @@ func xmlTagEndDelimiterLenEndingAt(text string, end int) int {
 	if end < 0 || end >= len(text) {
 		return 0
 	}
-	for _, variant := range []string{">", "＞", "﹥", "〉"} {
-		if end+1 >= len(variant) && text[end+1-len(variant):end+1] == variant {
-			return len(variant)
-		}
+	if text[end] == '>' {
+		return 1
+	}
+	if end+1 >= len("＞") && text[end+1-len("＞"):end+1] == "＞" {
+		return len("＞")
 	}
 	return 0
 }
@@ -703,22 +688,4 @@ func findTrailingToolCDATACloseStart(text string) int {
 		}
 	}
 	return -1
-}
-
-// namesHitWhitelist returns true when at least one call name appears in
-// availableNames. Returns false when either slice is empty.
-func namesHitWhitelist(calls []ParsedToolCall, availableNames []string) bool {
-	if len(availableNames) == 0 || len(calls) == 0 {
-		return false
-	}
-	set := make(map[string]struct{}, len(availableNames))
-	for _, n := range availableNames {
-		set[n] = struct{}{}
-	}
-	for _, c := range calls {
-		if _, ok := set[c.Name]; ok {
-			return true
-		}
-	}
-	return false
 }

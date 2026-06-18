@@ -44,13 +44,20 @@ func consumeXMLToolCapture(captured string, toolNames []string) (prefix string, 
 		xmlBlock := captured[tag.Start : closeTag.End+1]
 		prefixPart := captured[:tag.Start]
 		suffixPart := captured[closeTag.End+1:]
-		parsed := toolcall.ParseToolCalls(xmlBlock, toolNames)
-		if len(parsed) > 0 {
+		parsed := toolcall.ParseStandaloneToolCallsDetailed(xmlBlock, toolNames)
+		if len(parsed.Calls) > 0 {
 			prefixPart, suffixPart = trimWrappingJSONFence(prefixPart, suffixPart)
 			if best == nil || tag.Start < best.start {
-				best = &candidate{start: tag.Start, prefix: prefixPart, calls: parsed, suffix: suffixPart}
+				best = &candidate{start: tag.Start, prefix: prefixPart, calls: parsed.Calls, suffix: suffixPart}
 			}
 			break
+		}
+		if parsed.SawToolCallSyntax {
+			if rejected == nil || tag.Start < rejected.start {
+				rejected = &rejectedBlock{start: tag.Start, prefix: prefixPart + xmlBlock, suffix: suffixPart}
+			}
+			searchFrom = tag.End + 1
+			continue
 		}
 		if rejected == nil || tag.Start < rejected.start {
 			rejected = &rejectedBlock{start: tag.Start, prefix: prefixPart + xmlBlock, suffix: suffixPart}
@@ -75,10 +82,13 @@ func consumeXMLToolCapture(captured string, toolNames []string) (prefix string, 
 				xmlBlock := "<tool_calls>" + captured[invokeTag.Start:closeTag.End+1]
 				prefixPart := captured[:invokeTag.Start]
 				suffixPart := captured[closeTag.End+1:]
-				parsed := toolcall.ParseToolCalls(xmlBlock, toolNames)
-				if len(parsed) > 0 {
+				parsed := toolcall.ParseStandaloneToolCallsDetailed(xmlBlock, toolNames)
+				if len(parsed.Calls) > 0 {
 					prefixPart, suffixPart = trimWrappingJSONFence(prefixPart, suffixPart)
-					return prefixPart, parsed, suffixPart, true
+					return prefixPart, parsed.Calls, suffixPart, true
+				}
+				if parsed.SawToolCallSyntax {
+					return prefixPart + captured[invokeTag.Start:closeTag.End+1], nil, suffixPart, true
 				}
 				return prefixPart + captured[invokeTag.Start:closeTag.End+1], nil, suffixPart, true
 			}
@@ -131,6 +141,9 @@ func shouldKeepBareInvokeCapture(captured string) bool {
 	if invokeCloseTag, ok := findFirstToolMarkupTagByNameFrom(captured, startEnd+1, "invoke", true); ok {
 		return strings.TrimSpace(captured[invokeCloseTag.End+1:]) == ""
 	}
+	if paramTag, ok := findFirstToolMarkupTagByName(body, 0, "parameter"); ok && strings.TrimSpace(body[:paramTag.Start]) == "" {
+		return true
+	}
 
 	trimmedLower := strings.ToLower(trimmedBody)
 	return strings.HasPrefix(trimmedLower, "<parameter") ||
@@ -139,43 +152,27 @@ func shouldKeepBareInvokeCapture(captured string) bool {
 }
 
 func findPartialXMLToolTagStart(s string) int {
-	lastLT := strings.LastIndex(s, "<")
+	lastLT := lastToolMarkupStartDelimiterIndex(s)
 	if lastLT < 0 {
 		return -1
 	}
-	tail := s[lastLT:]
-	// If there's a '>' in the tail, the tag is closed — not partial.
-	if strings.Contains(tail, ">") {
+	start := includeDuplicateLeadingLessThan(s, lastLT)
+	tail := s[start:]
+	// If there's a tag terminator in the tail, the tag is closed — not partial.
+	if strings.Contains(tail, ">") || strings.Contains(tail, "＞") {
 		return -1
 	}
 	if toolcall.IsPartialToolMarkupTagPrefix(tail) {
-		return lastLT
+		return start
 	}
 	return -1
 }
 
-func buildXMLPartialToolTagsToDetect() []string {
-	tags := []string{
-		"<tool_calls", "<invoke", "<parameter",
-		"<|tool_calls", "<|invoke", "<|parameter",
-		"<｜tool_calls", "<｜invoke", "<｜parameter",
+func lastToolMarkupStartDelimiterIndex(s string) int {
+	asciiIdx := strings.LastIndex(s, "<")
+	fullwidthIdx := strings.LastIndex(s, "＜")
+	if asciiIdx > fullwidthIdx {
+		return asciiIdx
 	}
-	for _, marker := range []string{"dsml", "dmsl"} {
-		for _, prefix := range []string{
-			"<|" + marker + "|",
-			"<｜" + marker + "|",
-			"<|" + marker,
-			"<｜" + marker,
-			"<|" + marker + " ",
-			"<｜" + marker + " ",
-			"<" + marker + "|",
-			"<" + marker,
-			"<" + marker + " ",
-		} {
-			for _, name := range []string{"tool_calls", "invoke", "parameter"} {
-				tags = append(tags, prefix+name)
-			}
-		}
-	}
-	return tags
+	return fullwidthIdx
 }
